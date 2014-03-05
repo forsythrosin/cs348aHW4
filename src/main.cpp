@@ -24,7 +24,7 @@ int lastPos[2];
 float cameraPos[4] = {0,0,4,1};
 Vec3f up, pan;
 int windowWidth = 640, windowHeight = 480;
-bool showSurface = true, showAxes = true, showCurvature = false, showNormals = false;
+bool showSurface = true, showAxes = true, showCurvature = false, showNormals = false, showWireframe = false;
 
 float specular[] = { 1.0, 1.0, 1.0, 1.0 };
 float shininess[] = { 50.0 };
@@ -37,39 +37,57 @@ void renderSuggestiveContours(Vec3f actualCamPos) { // use this camera position 
 }
 
 void renderMesh() {
-	if (!showSurface) glColorMask(GL_FALSE,GL_FALSE,GL_FALSE,GL_FALSE); // render regardless to remove hidden lines
+	if (!showSurface && !showWireframe)
+          glColorMask(GL_FALSE,GL_FALSE,GL_FALSE,GL_FALSE); // render regardless to remove hidden lines
 	
 	glEnable(GL_LIGHTING);
 	glLightfv(GL_LIGHT0, GL_POSITION, cameraPos);
 
 	glDepthRange(0.001,1);
 	glEnable(GL_NORMALIZE);
+
+        Vec3f actualCamPos(cameraPos[0]+pan[0],cameraPos[1]+pan[1],cameraPos[2]+pan[2]);
 	
 	// WRITE CODE HERE TO RENDER THE TRIANGLES OF THE MESH
-	// ---------------------------------------------------------
+	// ---------------------------------
 	OpenMesh::Vec3f point, normal;
 	Mesh::FaceIter f_it, f_end(mesh.faces_end());
-	glBegin(GL_TRIANGLES);
 	for (f_it = mesh.faces_begin(); f_it != f_end; ++f_it){
 	  Mesh::FaceHandle fh = f_it.handle();
 	  Mesh::FaceVertexIter fv_it;
-	  for (fv_it = mesh.fv_iter(fh); fv_it; ++fv_it) {
-	    Mesh::VertexHandle vh = fv_it.handle();
-	    normal = mesh.normal(vh);
-	    glNormal3f(normal.values_[0], normal.values_[1], normal.values_[2]);
-	    point = mesh.point(vh);
-	    glVertex3f(point.values_[0], point.values_[1], point.values_[2]);
-	  }
+
+          if (showWireframe) {
+            normal = mesh.normal(fh);
+            if ((normal | actualCamPos) > 0) {
+              glBegin(GL_LINE_LOOP);
+              for (fv_it = mesh.fv_iter(fh); fv_it; ++fv_it) {
+                Mesh::VertexHandle vh = fv_it.handle();
+                point = mesh.point(vh);
+                glVertex3f(point.values_[0], point.values_[1], point.values_[2]);
+              }
+              glEnd();
+            }
+          }
+          else {
+            glBegin(GL_TRIANGLES);
+            for (fv_it = mesh.fv_iter(fh); fv_it; ++fv_it) {
+              Mesh::VertexHandle vh = fv_it.handle();
+              normal = mesh.normal(vh);
+              glNormal3f(normal.values_[0], normal.values_[1], normal.values_[2]);
+              point = mesh.point(vh);
+              glVertex3f(point.values_[0], point.values_[1], point.values_[2]);
+            }
+            glEnd();
+          }
 	}
-	glEnd();
-	// -------------------------------------------------------------------------------------------------------------
+	// ---------------------------------
 	
 	if (!showSurface) glColorMask(GL_TRUE,GL_TRUE,GL_TRUE,GL_TRUE);
 	
 	glDisable(GL_LIGHTING);
 	glDepthRange(0,0.999);
 	
-	Vec3f actualCamPos(cameraPos[0]+pan[0],cameraPos[1]+pan[1],cameraPos[2]+pan[2]);
+	//Vec3f actualCamPos(cameraPos[0]+pan[0],cameraPos[1]+pan[1],cameraPos[2]+pan[2]);
 	renderSuggestiveContours(actualCamPos);
 	
 	// We'll be nice and provide you with code to render feature edges below
@@ -222,6 +240,7 @@ void keyboard(unsigned char key, int x, int y) {
 	else if (key == 'c' || key == 'C') showCurvature = !showCurvature;
 	else if (key == 'n' || key == 'N') showNormals = !showNormals;
 	else if (key == 'w' || key == 'W') writeImage(mesh, windowWidth, windowHeight, "renderedImage.svg", actualCamPos);
+        else if (key == 'f' || key == 'F') showWireframe = !showWireframe;
 	else if (key == 'q' || key == 'Q') exit(0);
 	glutPostRedisplay();
 }
@@ -256,7 +275,7 @@ int main(int argc, char** argv) {
 	cout << '\t' << mesh.n_edges() << " edges.\n";
 	cout << '\t' << mesh.n_faces() << " faces.\n";
 	
-	//simplify(mesh, 0.10f);
+	//simplify(mesh, 0.50f);
 	
 	mesh.update_normals();
 	
