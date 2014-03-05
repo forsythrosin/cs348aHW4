@@ -150,7 +150,7 @@ void display() {
 	glViewport(0,0,windowWidth,windowHeight);
 	
 	float ratio = (float)windowWidth / (float)windowHeight;
-	gluPerspective(50, ratio, 1, 1000); // 50 degree vertical viewing angle, zNear = 1, zFar = 1000
+	gluPerspective(50, ratio, 0.1, 1000); // 50 degree vertical viewing angle, zNear = 0.1, zFar = 1000
 	
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
