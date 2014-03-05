@@ -45,7 +45,23 @@ void renderMesh() {
 	glDepthRange(0.001,1);
 	glEnable(GL_NORMALIZE);
 	
-	// WRITE CODE HERE TO RENDER THE TRIANGLES OF THE MESH ---------------------------------------------------------
+	// WRITE CODE HERE TO RENDER THE TRIANGLES OF THE MESH
+	// ---------------------------------------------------------
+	OpenMesh::Vec3f point, normal;
+	Mesh::FaceIter f_it, f_end(mesh.faces_end());
+	glBegin(GL_TRIANGLES);
+	for (f_it = mesh.faces_begin(); f_it != f_end; ++f_it){
+	  Mesh::FaceHandle fh = f_it.handle();
+	  Mesh::FaceVertexIter fv_it;
+	  for (fv_it = mesh.fv_iter(fh); fv_it; ++fv_it) {
+	    Mesh::VertexHandle vh = fv_it.handle();
+	    normal = mesh.normal(vh);
+	    glNormal3f(normal.values_[0], normal.values_[1], normal.values_[2]);
+	    point = mesh.point(vh);
+	    glVertex3f(point.values_[0], point.values_[1], point.values_[2]);
+	  }
+	}
+	glEnd();
 	// -------------------------------------------------------------------------------------------------------------
 	
 	if (!showSurface) glColorMask(GL_TRUE,GL_TRUE,GL_TRUE,GL_TRUE);
@@ -73,6 +89,28 @@ void renderMesh() {
 	
 	if (showCurvature) {
 		// WRITE CODE HERE TO RENDER THE PRINCIPAL DIRECTIONS YOU COMPUTED ---------------------------------------------
+	  glBegin(GL_LINES);
+	  for (Mesh::ConstVertexIter it = mesh.vertices_begin(); it != mesh.vertices_end(); ++it){
+	    CurvatureInfo info = mesh.property(curvature, it);
+	    Vec3f p = mesh.point(it.handle()),
+	      d1 = info.directions[0].normalized(),
+	      d2 = info.directions[1].normalized();
+	    float k1 = info.curvatures[0],
+	      k2 = info.curvatures[1];
+	    float vecLength = 0.02f;
+	    Vec3f p10 = p - vecLength/2 * d1,
+	      p11 = p + vecLength/2 * d1,
+	      p20 = p - vecLength/2 * d2,
+	      p21 = p + vecLength/2 * d2;
+	    
+	    glColor3f(1,0,0); // maximum curvature direction
+	    glVertex3f(p10[0],p10[1],p10[2]);
+	    glVertex3f(p11[0],p11[1],p11[2]);
+	    glColor3f(0,0,1); // minimum curvature direction
+	    glVertex3f(p20[0],p20[1],p20[2]);
+	    glVertex3f(p21[0],p21[1],p21[2]);
+	  }
+	  glEnd();
 		// -------------------------------------------------------------------------------------------------------------
 	}
 	
