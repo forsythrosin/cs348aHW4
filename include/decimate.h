@@ -74,6 +74,28 @@ public:
 				+ 2.0 * i * z + j;
 	}
 
+        /// build matrix from this quadric
+        Eigen::Matrix4d toMatrix() const {
+          Eigen::Matrix4d mQ;
+          mQ(0, 0) = a;
+          mQ(0, 1) = b;
+          mQ(0, 2) = c;
+          mQ(0, 3) = d;
+          mQ(1, 0) = b;
+          mQ(1, 1) = e;
+          mQ(1, 2) = f;
+          mQ(1, 3) = g;
+          mQ(2, 0) = c;
+          mQ(2, 1) = f;
+          mQ(2, 2) = h;
+          mQ(2, 3) = i;
+          mQ(3, 0) = d;
+          mQ(3, 1) = g;
+          mQ(3, 2) = i;
+          mQ(3, 3) = j;
+          return mQ;
+        }
+
 private:
 
 	Scalar a, b, c, d, e, f, g, h, i, j;
