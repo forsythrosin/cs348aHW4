@@ -74,11 +74,11 @@ void simplify(Mesh &mesh, float percentage) {
 }
 
 void computeQuadric (Mesh &mesh, Mesh::VertexHandle vi) {
-  priority(mesh, vi) = -1.0;
   quadric(mesh, vi).clear();
 
   // INSERT CODE HERE FOR PART 1
   // calc vertex quadrics from incident triangles
+  Mesh::Point v = mesh.point(vi);
   Mesh::Point n;
   double a, b, c, d, length;
   Mesh::VertexFaceIter vf_it;      // To iterate through incident faces
@@ -92,8 +92,8 @@ void computeQuadric (Mesh &mesh, Mesh::VertexHandle vi) {
     a /= length;
     b /= length;
     c /= length;
-    assert (a*a + b*b + c*c - 1.0 < EPSILON);
-    d = -1;
+    assert (fabs(a*a + b*b + c*c - 1.0) < EPSILON);
+    d = -(a*v[0] + b*v[1] + c*v[2]);
     quadric(mesh, vi) += Quadricd(a, b, c, d);
   }
 }
@@ -239,36 +239,39 @@ void decimate(Mesh &mesh, unsigned int _n_vertices) {
           // RIP OUT THE FIRST ELEMENT OF THE PRIORITY QUEUE
           PQueue::iterator pit = queue.begin();
           Mesh::VertexHandle vi_handle = *pit;
+          queue.erase(pit);
 
           // COLLAPSE THE EDGE
           Mesh::HalfedgeHandle vhe_handle = target(mesh, vi_handle);
           if (is_collapse_legal(mesh, vhe_handle)) {
             Mesh::VertexHandle vj_handle = mesh.to_vertex_handle(vhe_handle);
-            //gather affected vertices and update their quadrics.
-            set<Mesh::VertexHandle> affectedVerts;
-            for (Mesh::VertexVertexIter vv_it = mesh.vv_iter(vi_handle); vv_it; ++vv_it) {
-              affectedVerts.insert(vv_it.handle());
-            }
+
+            //update quadric of the updated vertex
             Quadricd Qi = quadric(mesh, vi_handle);
             quadric(mesh, vj_handle) += Qi;
-            Qi.renormalize();
 
             //collapse the half-edge
             mesh.collapse(vhe_handle);
             --nv;
 
-            //update neighboring vertices and their quadrics
-            for (set<Mesh::VertexHandle>::iterator vv_it = affectedVerts.begin(); vv_it != affectedVerts.end(); ++vv_it) {
-              //computeQuadric(mesh, *vv_it);
-              //quadric(mesh, *vv_it) += Qi;
-              //quadric(mesh, *vv_it).renormalize();
+            //TODO: check this part with TAs
+            //Find vertices affected by collapse.
+            //The affected vertices are neighbors of vj
+            //(the vertex that was *not* deleted),
+            //and vj itself.
+            set<Mesh::VertexHandle> affectedVerts;
+            for (Mesh::VertexVertexIter vv_it = mesh.vv_iter(vj_handle); vv_it; ++vv_it) {
+              affectedVerts.insert(vv_it.handle());
             }
+            affectedVerts.insert(vj_handle);
+            assert (affectedVerts.find(vi_handle) == affectedVerts.end());
+
             for (set<Mesh::VertexHandle>::iterator vv_it = affectedVerts.begin(); vv_it != affectedVerts.end(); ++vv_it) {
               enqueue_vertex(mesh, *vv_it);
             }
           }
-          //--nv;
-          queue.erase(pit);
+
+          assert (queue.find(vi_handle) == queue.end());
         }
 
 	// clean up after decimation

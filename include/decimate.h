@@ -35,11 +35,6 @@ public:
 		a = b = c = d = e = f = g = h = i = j = 0.0;
 	}
 
-        void renormalize() {
-          double l = a*a + e*e + h*h;
-          *this = QuadricT(a/l, e/l, d/l, -1);
-        }
-
 	/// add quadrics
 	QuadricT<Scalar>& operator+=(const QuadricT<Scalar>& _q) {
 		a += _q.a;
