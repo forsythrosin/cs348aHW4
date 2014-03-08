@@ -6,6 +6,7 @@ using namespace Eigen;
 
 bool isSilhouette(Mesh &mesh, const Mesh::EdgeHandle &e, Vec3f cameraPos)  {
     // CHECK IF e IS A SILHOUETTE HERE ------
+
     Mesh::VertexHandle vh = mesh.to_vertex_handle(mesh.halfedge_handle(e,0));
     Vec3f tc = cameraPos - mesh.point(vh);
     Vector3d toCamera(tc.values_[0],tc.values_[1],tc.values_[2]); 
@@ -33,7 +34,7 @@ bool isSharpEdge(Mesh &mesh, const Mesh::EdgeHandle &e) {
     Vec3f mesh_n1 = mesh.normal(fh1);
     Vector3d normal1(mesh_n1.values_[0],mesh_n1.values_[1],mesh_n1.values_[2]); 
 
-    return(normal0.transpose() * normal1 < 0.5);
+    return(normal0.normalized().dot(normal1.normalized()) < 0.5);
     // --------------------------------------
 }
 

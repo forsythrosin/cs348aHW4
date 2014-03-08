@@ -142,7 +142,6 @@ void computeCurvature(Mesh &mesh, OpenMesh::VPropHandleT<CurvatureInfo> &curvatu
 void computeViewCurvature(Mesh &mesh, OpenMesh::Vec3f camPos, OpenMesh::VPropHandleT<CurvatureInfo> &curvature, OpenMesh::VPropHandleT<double> &viewCurvature, OpenMesh::FPropHandleT<OpenMesh::Vec3f> &viewCurvatureDerivative) {
   // WRITE CODE HERE TO COMPUTE CURVATURE IN THE VIEW PROJECTION PROJECTED ON THE TANGENT PLANE ------------------
   // Compute vector to viewer and project onto tangent plane, then use components in principal directions to find curvature
-  computeCurvature(mesh, curvature);
 
   for (Mesh::VertexIter it = mesh.vertices_begin(); it != mesh.vertices_end(); ++it) {
     Mesh::VertexHandle vi_h = it.handle();
@@ -164,13 +163,12 @@ void computeViewCurvature(Mesh &mesh, OpenMesh::Vec3f camPos, OpenMesh::VPropHan
     float k1 = info.curvatures[0],
       k2 = info.curvatures[1];
 
-    Vector3d pd(d1[0],d1[1],d1[2]);
-    pd.normalize();
+    float epsilon = 1e-8;
+    Vector3d dg = toCam_S * epsilon;
 
-    float fi = acos(pd.dot(toCam_S));
-    float kr = k1 * cos(fi)*cos(fi) + k2 * sin(fi)*sin(fi);
+    float Kr = 2*ni.dot(dg)/(epsilon*epsilon);
 
-    mesh.property(viewCurvature, it) = kr;
+    mesh.property(viewCurvature, it) = Kr;
   }  
 
 

@@ -30,10 +30,74 @@ float specular[] = { 1.0, 1.0, 1.0, 1.0 };
 float shininess[] = { 50.0 };
 
 void renderSuggestiveContours(Vec3f actualCamPos) { // use this camera position to account for panning etc.
-	glColor3f(.5,.5,.5);
 	
-	// RENDER SUGGESTIVE CONTOURS HERE -----------------------------------------------------------------------------
-	// -------------------------------------------------------------------------------------------------------------
+        glBegin(GL_LINES);
+        glColor3f(.5,.5,.5);
+
+	float thresholdDwKw = 0.5;
+	float smallAngleThreshold = 3.14/8;
+	
+	// RENDER SUGGESTIVE CONTOURS HERE -------------
+	Mesh::FaceIter f_it, f_end(mesh.faces_end());
+	for (f_it = mesh.faces_begin(); f_it != f_end; ++f_it) {
+	  Vec3f mesh_vcd = mesh.property(viewCurvatureDerivative, f_it);
+	  Vector3d vcd(mesh_vcd[0], mesh_vcd[1], mesh_vcd[2]);
+
+	  Mesh::FaceVertexIter fv_it = mesh.fv_iter(f_it.handle());
+	  Vec3f mesh_w = actualCamPos - mesh.point(fv_it.handle());
+	  Vector3d w(mesh_w[0], mesh_w[1], mesh_w[2]);
+	  w.normalize();
+
+	  Vec3f mesh_n = mesh.normal(f_it);
+	  Vector3d n(mesh_n[0], mesh_n[1], mesh_n[2]);
+	  n.normalize();
+
+	  float wn = w.dot(n);
+	  float DwKw = w.dot(vcd.normalized());
+
+	  if (acos(wn) > smallAngleThreshold && DwKw > thresholdDwKw) {
+	    //glColor3f((1+abs(wn))/2,(1+abs(wn))/2,(1+abs(wn))/2);
+	    int i;
+	    Vec3f v[3];
+	    float Kw[3];
+	    for (i = 0; fv_it; ++fv_it, i++) {
+	      v[i] = mesh.point(fv_it);
+	      Kw[i] = mesh.property(viewCurvature, fv_it);
+	    }
+	    assert(i == 3);
+	    bool diff01 = Kw[0] * Kw[1] < 0,
+	      diff02 = Kw[0] * Kw[2] < 0,
+	      nonzero = Kw[0] != 0 && Kw[1] != 0 && Kw[2] != 0;
+	    int j = -1;
+	    if (diff01) {
+	      if (diff02) {
+		// v[0] different sign
+	        j = 0;
+	      } else {
+		// v[1] different sign
+		j = 1;
+	      }
+	    } else if (diff02) {
+	      // v[2] different sign
+	      j = 2;
+	    }
+	    if (nonzero && j >= 0) {
+	      // suggestive contour
+	      int j1 = (j+1)%3, j2 = (j+2)%3;
+	      float diff1 = Kw[j]-Kw[j1],
+		diff2 = Kw[j]-Kw[j2];
+	      assert(Kw[j] * Kw[j1] < 0);
+	      assert(Kw[j] * Kw[j2] < 0);
+	      Vec3f p1 = v[j] + Kw[j] / diff1 * (v[j1] - v[j]),
+		p2 = v[j] + Kw[j] / diff2 * (v[j2] - v[j]);
+	      glVertex3f(p1[0],p1[1],p1[2]);
+	      glVertex3f(p2[0],p2[1],p2[2]);
+	    }
+	  }
+	}
+	glEnd();
+
+	// ---------------------------------------------
 }
 
 void renderMesh() {
