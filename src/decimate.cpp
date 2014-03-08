@@ -1,17 +1,15 @@
-#include <Eigen/Core>
-#include <Eigen/LU>
 #include "decimate.h"
 #include <iostream>
 #include <set>
 #include <float.h>
 using namespace OpenMesh;
-using namespace Eigen;
 using namespace std;
+
+const double EPSILON = 0.00001;
 
 VPropHandleT<Quadricd> vquadric;
 VPropHandleT<float> vprio;
 VPropHandleT<Mesh::HalfedgeHandle> vtarget;
-
 
 void initDecimation(Mesh & mesh);
 bool is_collapse_legal(Mesh &mesh, Mesh::HalfedgeHandle _hh);
@@ -75,35 +73,42 @@ void simplify(Mesh &mesh, float percentage) {
         std::cout << "Simplifying to #vertices: " << mesh.n_vertices() << std::endl;
 }
 
+void computeQuadric (Mesh &mesh, Mesh::VertexHandle vi) {
+  priority(mesh, vi) = -1.0;
+  quadric(mesh, vi).clear();
+
+  // INSERT CODE HERE FOR PART 1
+  // calc vertex quadrics from incident triangles
+  Mesh::Point n;
+  double a, b, c, d, length;
+  Mesh::VertexFaceIter vf_it;      // To iterate through incident faces
+  for(vf_it = mesh.vf_iter(vi); vf_it; ++vf_it) {
+    Mesh::FaceVertexIter fv_it = mesh.fv_iter(vf_it.handle());
+    n = mesh.normal(vf_it);
+    a = n[0];
+    b = n[1];
+    c = n[2];
+    length = sqrt(a*a + b*b + c*c);
+    a /= length;
+    b /= length;
+    c /= length;
+    assert (a*a + b*b + c*c - 1.0 < EPSILON);
+    d = -1;
+    quadric(mesh, vi) += Quadricd(a, b, c, d);
+  }
+}
+
 void initDecimation(Mesh &mesh) {
 	// compute face normals
 	mesh.update_face_normals();
 
 	Mesh::VertexIter v_it, v_end = mesh.vertices_end();
-	Mesh::Point n;
-	Mesh::VertexFaceIter vf_it;      // To iterate through incident faces
-	double a, b, c, d, length;
 	Mesh::Scalar sum;
 
 	for (v_it = mesh.vertices_begin(); v_it != v_end; ++v_it) {
           priority(mesh, v_it) = -1.0;
-          quadric(mesh, v_it).clear();
           sum = 0;                            // Reset for each iteration
-          
-          // INSERT CODE HERE FOR PART 1
-          // calc vertex quadrics from incident triangles
-          // TODO: do we need a^2 + b^2 + c^2 = 1?
-          Mesh::Point v = mesh.point(v_it.handle());
-          for(vf_it = mesh.vf_iter(v_it.handle()); vf_it; ++vf_it) {
-            Mesh::FaceVertexIter fv_it = mesh.fv_iter(vf_it.handle());
-            Mesh::Point fp = mesh.point(fv_it); //a vertex on face
-            n = mesh.normal(vf_it);
-            a = n[0];
-            b = n[1];
-            c = n[2];
-            d = -a*fp[0] - b*fp[1] - c*fp[2];
-            quadric(mesh, v_it) += Quadricd(a, b, c, d);
-          }
+          computeQuadric (mesh, v_it.handle());
 	}
     std::cout << "Finished init" << std::endl;
 }
@@ -166,27 +171,13 @@ float priority(Mesh &mesh, Mesh::HalfedgeHandle _heh) {
   // -------------------------------------------------------------------------------------------------------------
   Mesh::VertexHandle vi_handle = mesh.from_vertex_handle(_heh);
   Mesh::VertexHandle vj_handle = mesh.to_vertex_handle(_heh);
-  Mesh::Point vi = mesh.point(vi_handle);
   Mesh::Point vj = mesh.point(vj_handle);
   Quadricd Qi = quadric(mesh, vi_handle);
   Quadricd Qj = quadric(mesh, vj_handle);
   Quadricd Q = Qi;
   Q += Qj;
 
-  //solve for vbar: the vertex minimizing error on this edge
-  Matrix4d mQ = Q.toMatrix();
-  mQ(3, 0) = 0;
-  mQ(3, 1) = 0;
-  mQ(3, 2) = 0;
-  mQ(3, 3) = 1;
-
-  //TODO do the inverse?
-  //TODO check if mQ is singular first?
-  //Vector4d vbar = mQ.inverse() * Vector4d(0, 0, 0, 1);
-  
-  Vector4d vbar = Vector4d(vj[0], vj[1], vj[2], 1);
-
-  return vbar.transpose() * Q.toMatrix() * vbar;
+  return Q(OpenMesh::VectorT<double, 3>(vj[0], vj[1], vj[2]));
 }
 
 void enqueue_vertex(Mesh &mesh, Mesh::VertexHandle _vh) {
@@ -240,7 +231,7 @@ void decimate(Mesh &mesh, unsigned int _n_vertices) {
 	// INSERT CODE HERE FOR PART 3-------
 	// DECIMATE THE MESH
 	// ----------------------------------
-        while(nv >= _n_vertices) {
+        while (nv >= _n_vertices) {
           if (queue.empty()) {
             std::cout << "decimate: ran out of vertices" << std::endl;
             break;
@@ -248,31 +239,36 @@ void decimate(Mesh &mesh, unsigned int _n_vertices) {
           // RIP OUT THE FIRST ELEMENT OF THE PRIORITY QUEUE
           PQueue::iterator pit = queue.begin();
           Mesh::VertexHandle vi_handle = *pit;
-          queue.erase(pit);
 
-          // CRUSH THIS HALFEDGE LIKE A CHICKEN BONE
+          // COLLAPSE THE EDGE
           Mesh::HalfedgeHandle vhe_handle = target(mesh, vi_handle);
           if (is_collapse_legal(mesh, vhe_handle)) {
             Mesh::VertexHandle vj_handle = mesh.to_vertex_handle(vhe_handle);
-            //Remove target vertex from queue
-            //PQueue::iterator qt_it = queue.find(mesh.to_vertex_handle(vhe_handle));
-            //if (qt_it != queue.end())
-            //  queue.erase(qt_it);
-            //collapse the 'from' vertex vi to the 'to' vertex vj
+            //gather affected vertices and update their quadrics.
+            set<Mesh::VertexHandle> affectedVerts;
+            for (Mesh::VertexVertexIter vv_it = mesh.vv_iter(vi_handle); vv_it; ++vv_it) {
+              affectedVerts.insert(vv_it.handle());
+            }
+            Quadricd Qi = quadric(mesh, vi_handle);
+            quadric(mesh, vj_handle) += Qi;
+            Qi.renormalize();
+
+            //collapse the half-edge
             mesh.collapse(vhe_handle);
             --nv;
 
-            //TODO: move the vertex to vbar or v2?
-            //TODO: ?
-
-            //TODO: put it back in or leave it?
-            //enqueue_vertex(mesh, vi_handle);
-
-            // SWEEP STORM OF DESTRUCTION OVER NEIGHBORING VERTICES
-            for(Mesh::VertexVertexIter vv_it = mesh.vv_iter(vj_handle); vv_it; ++vv_it) {
-              enqueue_vertex(mesh, vv_it.handle());
+            //update neighboring vertices and their quadrics
+            for (set<Mesh::VertexHandle>::iterator vv_it = affectedVerts.begin(); vv_it != affectedVerts.end(); ++vv_it) {
+              //computeQuadric(mesh, *vv_it);
+              //quadric(mesh, *vv_it) += Qi;
+              //quadric(mesh, *vv_it).renormalize();
+            }
+            for (set<Mesh::VertexHandle>::iterator vv_it = affectedVerts.begin(); vv_it != affectedVerts.end(); ++vv_it) {
+              enqueue_vertex(mesh, *vv_it);
             }
           }
+          //--nv;
+          queue.erase(pit);
         }
 
 	// clean up after decimation
