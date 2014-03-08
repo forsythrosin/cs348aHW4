@@ -34,24 +34,28 @@ void renderSuggestiveContours(Vec3f actualCamPos) { // use this camera position 
         glBegin(GL_LINES);
         glColor3f(.5,.5,.5);
 
-	float thresholdDwKw = 0.7;
-	float smallAngleThreshold = 0.2;
+	float thresholdDwKw = 0.5;
+	float smallAngleThreshold = 3.14/8;
 	
 	// RENDER SUGGESTIVE CONTOURS HERE -------------
 	Mesh::FaceIter f_it, f_end(mesh.faces_end());
 	for (f_it = mesh.faces_begin(); f_it != f_end; ++f_it) {
 	  Vec3f mesh_vcd = mesh.property(viewCurvatureDerivative, f_it);
 	  Vector3d vcd(mesh_vcd[0], mesh_vcd[1], mesh_vcd[2]);
+
 	  Mesh::FaceVertexIter fv_it = mesh.fv_iter(f_it.handle());
 	  Vec3f mesh_w = actualCamPos - mesh.point(fv_it.handle());
 	  Vector3d w(mesh_w[0], mesh_w[1], mesh_w[2]);
 	  w.normalize();
+
 	  Vec3f mesh_n = mesh.normal(f_it);
 	  Vector3d n(mesh_n[0], mesh_n[1], mesh_n[2]);
 	  n.normalize();
+
 	  float wn = w.dot(n);
 	  float DwKw = w.dot(vcd.normalized());
-	  if (abs(wn) < 1-smallAngleThreshold && DwKw > thresholdDwKw) {
+
+	  if (acos(wn) > smallAngleThreshold && DwKw > thresholdDwKw) {
 	    //glColor3f((1+abs(wn))/2,(1+abs(wn))/2,(1+abs(wn))/2);
 	    int i;
 	    Vec3f v[3];
