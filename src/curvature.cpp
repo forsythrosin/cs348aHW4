@@ -85,7 +85,7 @@ void computeCurvature(Mesh &mesh, OpenMesh::VPropHandleT<CurvatureInfo> &curvatu
                        abs(real(es.eigenvalues()[1])),
                        abs(real(es.eigenvalues()[2]))};;
     if (eVals[0] < eVals[1] && eVals[0] < eVals[2]){
-      assert (eVals[0] < EPSILON); //It's the zero
+      //assert (eVals[0] < EPSILON); //It's the zero
       i_n = 0;
 
       if (eVals[1] > eVals[2]) {
@@ -98,7 +98,7 @@ void computeCurvature(Mesh &mesh, OpenMesh::VPropHandleT<CurvatureInfo> &curvatu
       }
     }
     else if(eVals[1] < eVals[0] && eVals[1] < eVals[2]) {
-      assert (eVals[1] < EPSILON); //It's the zero
+      //assert (eVals[1] < EPSILON); //It's the zero
       i_n = 1;
 
       if (eVals[0] > eVals[2]) {
@@ -111,7 +111,7 @@ void computeCurvature(Mesh &mesh, OpenMesh::VPropHandleT<CurvatureInfo> &curvatu
       }
     }
     else {
-      assert (eVals[2] < EPSILON); //It's the zero
+      //assert (eVals[2] < EPSILON); //It's the zero
       i_n = 2;
 
       if (eVals[1] > eVals[0]) {
