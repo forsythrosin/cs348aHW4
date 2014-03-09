@@ -345,7 +345,7 @@ int main(int argc, char** argv) {
 	cout << '\t' << mesh.n_edges() << " edges.\n";
 	cout << '\t' << mesh.n_faces() << " faces.\n";
 	
-	//simplify(mesh, 0.10f);
+	simplify(mesh, 0.10f);
 	
 	mesh.update_normals();
 	

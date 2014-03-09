@@ -50,7 +50,6 @@ void writeImage(Mesh &mesh, int width, int height, string filename, Vec3f camPos
           Vec3f source(mesh.point(mesh.from_vertex_handle(h0)));
           Vec3f target(mesh.point(mesh.from_vertex_handle(h1)));
 	
-          //TODO: why does this block out vertices?
           if (!isVisible(source) || !isVisible(target)) continue;
 		
           Vec3f p1 = toImagePlane(source);
