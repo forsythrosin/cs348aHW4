@@ -37,28 +37,30 @@ bool isVisible(Vec3f point) {
 }
 
 void writeImage(Mesh &mesh, int width, int height, string filename, Vec3f camPos) {
+  cout << "writing image: " << filename << endl;
 	ofstream outfile(filename.c_str());
 	outfile << "<?xml version=\"1.0\" standalone=\"no\"?>\n";
 	outfile << "<svg width=\"5in\" height=\"5in\" viewBox=\"0 0 " << width << ' ' << height << "\">\n";
 	outfile << "<g stroke=\"black\" fill=\"black\">\n";
-	
+
 	// Sample code for generating image of the entire triangle mesh:
-	/*for (Mesh::ConstEdgeIter it = mesh.edges_begin(); it != mesh.edges_end(); ++it) {
-		Mesh::HalfedgeHandle h0 = mesh.halfedge_handle(it,0);
-		Mesh::HalfedgeHandle h1 = mesh.halfedge_handle(it,1);
-		Vec3f source(mesh.point(mesh.from_vertex_handle(h0)));
-		Vec3f target(mesh.point(mesh.from_vertex_handle(h1)));
+	for (Mesh::ConstEdgeIter it = mesh.edges_begin(); it != mesh.edges_end(); ++it) {
+          Mesh::HalfedgeHandle h0 = mesh.halfedge_handle(it,0);
+          Mesh::HalfedgeHandle h1 = mesh.halfedge_handle(it,1);
+          Vec3f source(mesh.point(mesh.from_vertex_handle(h0)));
+          Vec3f target(mesh.point(mesh.from_vertex_handle(h1)));
+	
+          //TODO: why does this block out vertices?
+          if (!isVisible(source) || !isVisible(target)) continue;
 		
-		if (!isVisible(source) || !isVisible(target)) continue;
-		
-		Vec3f p1 = toImagePlane(source);
-		Vec3f p2 = toImagePlane(target);
-		outfile << "<line ";
-		outfile << "x1=\"" << p1[0] << "\" ";
-		outfile << "y1=\"" << height-p1[1] << "\" ";
-		outfile << "x2=\"" << p2[0] << "\" ";
-		outfile << "y2=\"" << height-p2[1] << "\" stroke-width=\"1\" />\n";
-	}*/
+          Vec3f p1 = toImagePlane(source);
+          Vec3f p2 = toImagePlane(target);
+          outfile << "<line ";
+          outfile << "x1=\"" << p1[0] << "\" ";
+          outfile << "y1=\"" << height-p1[1] << "\" ";
+          outfile << "x2=\"" << p2[0] << "\" ";
+          outfile << "y2=\"" << height-p2[1] << "\" stroke-width=\"1\" />\n";
+	}
 	
 	// WRITE CODE HERE TO GENERATE A .SVG OF THE MESH --------------------------------------------------------------
 
@@ -66,5 +68,5 @@ void writeImage(Mesh &mesh, int width, int height, string filename, Vec3f camPos
 	
 	outfile << "</g>\n";
 	outfile << "</svg>\n";
-
+        cout << "done" << endl;
 }

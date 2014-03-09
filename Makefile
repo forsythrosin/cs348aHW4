@@ -9,7 +9,7 @@ OBJS = objs/main.o objs/curvature.o objs/mesh_features.o objs/image_generation.o
 
 default: $(OBJS)
 	$(LD) $(OBJS) $(LDFLAGS) -L$(OPENMESH_LIB_DIR) $(LIB) -o $(TARGET)
-	
+
 objs/main.o: src/main.cpp
 	$(CPP) -c $(CPPFLAGS) src/main.cpp -o objs/main.o $(INCLUDE)
 

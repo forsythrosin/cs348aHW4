@@ -42,18 +42,22 @@ void renderSuggestiveContours(Vec3f actualCamPos) { // use this camera position 
 	for (f_it = mesh.faces_begin(); f_it != f_end; ++f_it) {
 	  Vec3f mesh_vcd = mesh.property(viewCurvatureDerivative, f_it);
 	  Vector3d vcd(mesh_vcd[0], mesh_vcd[1], mesh_vcd[2]);
+          Vec3f mesh_n = mesh.normal(f_it);
+	  Vector3d n(mesh_n[0], mesh_n[1], mesh_n[2]);
+	  n.normalize();
 
+          //TODO: why only for first vertex of face?
 	  Mesh::FaceVertexIter fv_it = mesh.fv_iter(f_it.handle());
 	  Vec3f mesh_w = actualCamPos - mesh.point(fv_it.handle());
 	  Vector3d w(mesh_w[0], mesh_w[1], mesh_w[2]);
 	  w.normalize();
 
-	  Vec3f mesh_n = mesh.normal(f_it);
-	  Vector3d n(mesh_n[0], mesh_n[1], mesh_n[2]);
-	  n.normalize();
+          //TODO: do we need this to compute DwKw or does it not make a difference?
+          Vector3d w_S = w - (w.dot(n)) * n;
+          w_S.normalize();
 
-	  float wn = w.dot(n);
-	  float DwKw = w.dot(vcd.normalized());
+	  float wn = w.dot(n); //small angle btw surface normal and view vector
+	  float DwKw = w_S.dot(vcd.normalized());
 
 	  if (acos(wn) > smallAngleThreshold && DwKw > thresholdDwKw) {
 	    //glColor3f((1+abs(wn))/2,(1+abs(wn))/2,(1+abs(wn))/2);
@@ -341,7 +345,7 @@ int main(int argc, char** argv) {
 	cout << '\t' << mesh.n_edges() << " edges.\n";
 	cout << '\t' << mesh.n_faces() << " faces.\n";
 	
-	simplify(mesh, 0.10f);
+	//simplify(mesh, 0.10f);
 	
 	mesh.update_normals();
 	
