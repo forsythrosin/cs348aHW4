@@ -2,11 +2,175 @@
 #include "mesh_features.h"
 #include <GL/glut.h>
 #include <fstream>
-#include <set>
 #include <map>
+#include <set>
 #include <list>
 using namespace OpenMesh;
 using namespace std;
+
+struct VertexCompare : public binary_function <Vec3f, Vec3f, bool> {
+  bool operator() (const Vec3f& v1, const Vec3f &v2) const {
+    if (v1[0] < v2[0]) return true;
+    else if (v1[0] > v2[0]) return false;
+
+    if (v1[1] < v2[1]) return true;
+    else if (v1[1] > v2[1]) return false;
+
+    if (v1[2] < v2[2]) return true;
+    else if (v1[2] > v2[2]) return false;
+
+    return false;
+  }
+};
+
+//Multimap: Vertex -> all of its neighbors
+typedef map<Vec3f, const Vec3f*, VertexCompare> VertexMap;
+typedef map<const Vec3f*, list<const Vec3f*> > EdgeMap;
+struct ContourGraph {
+  VertexMap vertices; //to find unique copy of a vertex
+  EdgeMap edges; //vertex -> list of neighbors
+
+  void insertVertex(const Vec3f& v) {
+    if (vertices.find(v) == vertices.end()) {
+      const Vec3f* newVertex = new Vec3f(v);
+      vertices[v] = newVertex;
+      edges[newVertex].clear();
+    }
+  }
+
+  const Vec3f* getVertex(const Vec3f& v) const {
+    if (vertices.find(v) != vertices.end()) {
+      return vertices.find(v)->second;
+    }
+    return NULL;
+  }
+  /*
+  list<const Vec3f*>* getEdges(const Vec3f& v) {
+    const Vec3f *pv = getVertex(v);
+    if (pv) {
+      assert (edges.find(pv) != edges.end());
+      return edges[pv];
+    }
+    return NULL;
+    }*/
+};
+
+//Build graph of contour edges
+void buildGraph(ContourGraph &graph, const list<ContourEdge>& contourEdges) {
+  graph.vertices.clear();
+  graph.edges.clear();
+
+  //Collect all vertices and their neighbors
+  for (list<ContourEdge>::const_iterator cit = contourEdges.begin();
+       cit != contourEdges.end();
+       ++cit) {
+    const ContourEdge &c = *cit;
+    const Vec3f &v1 = c.source();
+    const Vec3f &v2 = c.target();
+    graph.insertVertex(v1);
+    graph.insertVertex(v2);
+    graph.edges[graph.getVertex(v1)].push_back(graph.getVertex(v2));
+    graph.edges[graph.getVertex(v2)].push_back(graph.getVertex(v1));
+  }
+
+  //Remove duplicate vertices from neighbor lists, and find vertices with 3+ neighbors.
+  set<const Vec3f*> breakVerts;
+  for (EdgeMap::iterator eit = graph.edges.begin(); eit != graph.edges.end(); ++eit) {
+    eit->second.unique();
+    if (eit->second.size() > 2) {
+      breakVerts.insert(eit->first);
+    }
+  }
+
+  //Some vertices (silhouette edges?) have 3 or more neighbors.
+  //Break those apart, because our algorithm to find chains assumes no vertex
+  //has 3 or more neighbors.
+  for (set<const Vec3f*>::const_iterator bvit = breakVerts.begin(); bvit != breakVerts.end(); ++bvit) {
+    const Vec3f* v = *bvit;
+    list<const Vec3f *> &vnbrs = graph.edges[v];
+    while (vnbrs.size() > 2) {
+      //Add slightly perturbed vertex
+      Vec3f newVert = *v;
+      while (graph.getVertex(newVert) != NULL) {
+        newVert[0] += EPSILON;
+        newVert[1] += EPSILON;
+        newVert[2] += EPSILON;
+      }
+      graph.insertVertex(newVert);
+      const Vec3f* newVertPtr = graph.getVertex(newVert);
+
+      //Remove edge from neighbor -> *bvit, add edge from neighbor -> newVert
+      const Vec3f *neighbor = vnbrs.front();
+      vnbrs.pop_front();
+      graph.edges[newVertPtr].push_back(neighbor);
+      graph.edges[neighbor].remove(v);
+      graph.edges[neighbor].push_back(newVertPtr);
+    }
+  }
+}
+
+//List of chains of vertices
+typedef list< list <const Vec3f*> > ChainList;
+
+/*
+//Explore a chain starting at one of v's neighbors
+void exploreChain(ContourGraph &graph, const Vec3f *v, list <const Vec3f*>& chain) {
+  assert (graph.vertices.find(*v) != graph.vertices.end());
+  list <const Vec3f *>& nbrs = graph.edges[v];
+  const Vec3f *currVertex = nbrs.front(); //a neighbor of v; start exploring here
+  nbrs.pop_front();
+  const Vec3f *lastVertex = &v;
+  while (currVertex) {
+    chain.push_back (currVertex);
+    list <const Vec3f *>* currNeighbors = NULL; //neighbor's neighbors
+    assert(graph.vertices.find(*currVertex) != graph.vertices.end());
+    currNeighbors = &graph.edges[currVertex];
+    assert(currNeighbors->size() <= 2);
+    currNeighbors->remove (lastVertex);
+    assert(currNeighbors->size() <= 1);
+    lastVertex = currVertex;
+    if (!currNeighbors->empty()) {
+      currVertex = currNeighbors->front();
+      currNeighbors->pop_front();
+    }
+    else {
+      currVertex = NULL; //reached the end
+    }
+    graph.vertices.erase(*lastVertex);
+    graph.edges.erase(lastVertex);
+  }
+}
+
+//Eat ContourGraph and build list of chains
+void buildChains(ContourGraph &graph, ChainList &chains) {
+  while (!graph.vertices.empty()) {
+    list <const Vec3f*> chain1, chain2;
+    const Vec3f& v = graph.vertices.begin()->first;
+
+    //explore each chain of vertices from V (up to 2)
+    list <const Vec3f *>& vnbrs = graph.begin()->second; //v's neighbors
+    assert (vnbrs.size() <= 2);
+    if (!vnbrs.empty()) {
+      exploreChain(graph, *vnbrs.front(), chain1);
+      vnbrs.pop_front();
+    }
+    if (!vnbrs.empty()) {
+      exploreChain(graph, *vnbrs.front(), chain2);
+      vnbrs.pop_front();
+    }
+    chain1.reverse();
+    graph.vertices.erase(v);
+
+    //build one new chain
+    list <const Vec3f*> newChain;
+    newChain.insert(newChain.end(), chain1.begin(), chain1.end());
+    newChain.push_back(&v);
+    newChain.insert(newChain.end(), chain2.begin(), chain2.end());
+
+    chains.push_back(newChain);
+  }
+}
+*/
 
 Vec3f toImagePlane(Vec3f point) {
 	GLdouble point3DX = point[0], point3DY = point[1], point3DZ = point[2];
@@ -39,6 +203,15 @@ bool isVisible(Vec3f point) {
 void writeImage(Mesh &mesh, int width, int height, string filename, Vec3f camPos,
                 const list<ContourEdge>& contourEdges) {
   cout << "writing image: " << filename << endl;
+
+  cout << "building graph" << endl;
+  ContourGraph graph;
+  buildGraph(graph, contourEdges);
+
+  cout << "building chains" << endl;
+  ChainList chains;
+  //buildChains(graph, chains);
+
 	ofstream outfile(filename.c_str());
 	outfile << "<?xml version=\"1.0\" standalone=\"no\"?>\n";
 	outfile << "<svg width=\"5in\" height=\"5in\" viewBox=\"0 0 " << width << ' ' << height << "\">\n";

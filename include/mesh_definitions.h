@@ -5,6 +5,8 @@
 #include <OpenMesh/Core/Mesh/TriMesh_ArrayKernelT.hh>
 #include <OpenMesh/Tools/Utils/getopt.h>
 
+const double EPSILON = 0.00001;
+
 struct MyTraits : public OpenMesh::DefaultTraits
 {
   HalfedgeAttributes(OpenMesh::Attributes::PrevHalfedge);
