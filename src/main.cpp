@@ -25,7 +25,7 @@ int lastPos[2];
 float cameraPos[4] = {0,0,4,1};
 Vec3f up, pan;
 int windowWidth = 640, windowHeight = 480;
-bool showSurface = true, showAxes = true, showCurvature = false, showNormals = false, showWireframe = false, showFeatureEdges = false;
+bool showSurface = true, showAxes = true, showCurvature = false, showNormals = false, showWireframe = false, showFeatureEdges = false, showSuggestiveContours = false;
 
 float specular[] = { 1.0, 1.0, 1.0, 1.0 };
 float shininess[] = { 50.0 };
@@ -123,7 +123,7 @@ void renderSuggestiveContours(Vec3f actualCamPos) { // use this camera position 
 void renderMesh() {
   contourEdges.clear();
   
-	if (!showSurface && !showWireframe)
+  if (!showSurface && !showWireframe)
           glColorMask(GL_FALSE,GL_FALSE,GL_FALSE,GL_FALSE); // render regardless to remove hidden lines
 	
 	glEnable(GL_LIGHTING);
@@ -168,12 +168,16 @@ void renderMesh() {
 	}
 	// ---------------------------------
 	
-	if (!showSurface) glColorMask(GL_TRUE,GL_TRUE,GL_TRUE,GL_TRUE);
+	//if (!showSurface)
+        if (!showSurface && !showWireframe)        
+          glColorMask(GL_TRUE,GL_TRUE,GL_TRUE,GL_TRUE);
 	
 	glDisable(GL_LIGHTING);
 	glDepthRange(0,0.999);
-	
-	renderSuggestiveContours(actualCamPos);
+
+        if (showSuggestiveContours) {
+          renderSuggestiveContours(actualCamPos);
+        }
 	
 	// We'll be nice and provide you with code to render feature edges below
         if (showFeatureEdges) {
@@ -331,6 +335,7 @@ void keyboard(unsigned char key, int x, int y) {
 	else if (key == 'w' || key == 'W') writeImage(mesh, windowWidth, windowHeight, "renderedImage.svg", actualCamPos, contourEdges);
         else if (key == 'f' || key == 'F') showWireframe = !showWireframe;
         else if (key == 'e' || key == 'E') showFeatureEdges = !showFeatureEdges;
+        else if (key == 'z' || key == 'Z') showSuggestiveContours = !showSuggestiveContours;
 	else if (key == 'q' || key == 'Q') exit(0);
 	glutPostRedisplay();
 }
@@ -365,7 +370,7 @@ int main(int argc, char** argv) {
 	cout << '\t' << mesh.n_edges() << " edges.\n";
 	cout << '\t' << mesh.n_faces() << " faces.\n";
 	
-	//simplify(mesh, 0.10f);
+	simplify(mesh, 0.10f);
 	
 	mesh.update_normals();
 	
