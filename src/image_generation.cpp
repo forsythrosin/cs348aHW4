@@ -5,6 +5,7 @@
 #include <map>
 #include <set>
 #include <list>
+#include <sstream>
 using namespace OpenMesh;
 using namespace std;
 
@@ -259,9 +260,14 @@ void writeImage(Mesh &mesh, int width, int height, string filename, Vec3f camPos
   */
   
   // Render chains of edges
+  //static const char* COLORS[] = {"red", "black", "blue", "green", "orange", "magenta", "cyan"};
+  //static const int N_COLORS = sizeof(COLORS) / sizeof(const char*);
   for (ChainList::const_iterator lcit = chains.begin(); lcit != chains.end(); ++lcit) {
     const list<const Vec3f*>& chain = *lcit;
     const Vec3f* lastVertex = NULL;
+    //const char* color = COLORS[rand() % N_COLORS];
+    stringstream sscolor;
+    sscolor << "rgb(" << rand() % 256 << "," << rand() % 256 << "," << rand() % 256 << ")";
     for (list<const Vec3f*>::const_iterator cit = chain.begin(); cit != chain.end(); ++cit) {
       const Vec3f* currVertex = *cit;
       if (lastVertex) {
@@ -272,7 +278,7 @@ void writeImage(Mesh &mesh, int width, int height, string filename, Vec3f camPos
         outfile << "x1=\"" << p1[0] << "\" ";
         outfile << "y1=\"" << height-p1[1] << "\" ";
         outfile << "x2=\"" << p2[0] << "\" ";
-        outfile << "y2=\"" << height-p2[1] << "\" stroke-width=\"1\" />\n";
+        outfile << "y2=\"" << height-p2[1] << "\" stroke=\"" << sscolor.str() << "\" stroke-width=\"1\" />\n";
       }
       lastVertex = currVertex;
     }
