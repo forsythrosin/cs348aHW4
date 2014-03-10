@@ -3,6 +3,7 @@
 #include <iostream>
 #include <cmath>
 #include <cstdio>
+#include <list>
 #include <GL/glut.h>
 #include <Eigen/Core>
 #include <Eigen/Eigenvalues>
@@ -28,6 +29,13 @@ bool showSurface = true, showAxes = true, showCurvature = false, showNormals = f
 
 float specular[] = { 1.0, 1.0, 1.0, 1.0 };
 float shininess[] = { 50.0 };
+
+//all contour edges of interest
+static list<ContourEdge> contourEdges;
+
+inline void addContourEdge(const Vec3f &p1, const Vec3f &p2) {
+  contourEdges.push_back(ContourEdge(p1, p2));
+}
 
 void renderSuggestiveContours(Vec3f actualCamPos) { // use this camera position to account for panning etc.
 	
@@ -96,6 +104,8 @@ void renderSuggestiveContours(Vec3f actualCamPos) { // use this camera position 
 		p2 = v[j] + Kw[j] / diff2 * (v[j2] - v[j]);
 	      glVertex3f(p1[0],p1[1],p1[2]);
 	      glVertex3f(p2[0],p2[1],p2[2]);
+
+              addContourEdge(p1, p2);
 	    }
 	  }
 	}
@@ -105,6 +115,8 @@ void renderSuggestiveContours(Vec3f actualCamPos) { // use this camera position 
 }
 
 void renderMesh() {
+  contourEdges.clear();
+  
 	if (!showSurface && !showWireframe)
           glColorMask(GL_FALSE,GL_FALSE,GL_FALSE,GL_FALSE); // render regardless to remove hidden lines
 	
@@ -170,6 +182,8 @@ void renderMesh() {
               Vec3f target(mesh.point(mesh.from_vertex_handle(h1)));
               glVertex3f(source[0],source[1],source[2]);
               glVertex3f(target[0],target[1],target[2]);
+
+              addContourEdge(source, target);
             }
           glEnd();
         }
@@ -308,7 +322,7 @@ void keyboard(unsigned char key, int x, int y) {
 	else if (key == 'a' || key == 'A') showAxes = !showAxes;
 	else if (key == 'c' || key == 'C') showCurvature = !showCurvature;
 	else if (key == 'n' || key == 'N') showNormals = !showNormals;
-	else if (key == 'w' || key == 'W') writeImage(mesh, windowWidth, windowHeight, "renderedImage.svg", actualCamPos);
+	else if (key == 'w' || key == 'W') writeImage(mesh, windowWidth, windowHeight, "renderedImage.svg", actualCamPos, contourEdges);
         else if (key == 'f' || key == 'F') showWireframe = !showWireframe;
         else if (key == 'e' || key == 'E') showFeatureEdges = !showFeatureEdges;
 	else if (key == 'q' || key == 'Q') exit(0);
@@ -381,7 +395,7 @@ int main(int argc, char** argv) {
 	glutMotionFunc(mouseMoved);
 	glutMouseFunc(mouse);
 	glutReshapeFunc(reshape);
-	glutKeyboardFunc(keyboard);
+	glutKeyboardFunc(keyboard); //TODO: is this asynchronous?
 
 	glutMainLoop();
 	

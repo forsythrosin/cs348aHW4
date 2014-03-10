@@ -36,7 +36,8 @@ bool isVisible(Vec3f point) {
 	return (bufDepth - projected[2]) > -EPSILON; // check sign!
 }
 
-void writeImage(Mesh &mesh, int width, int height, string filename, Vec3f camPos) {
+void writeImage(Mesh &mesh, int width, int height, string filename, Vec3f camPos,
+                const list<ContourEdge>& contourEdges) {
   cout << "writing image: " << filename << endl;
 	ofstream outfile(filename.c_str());
 	outfile << "<?xml version=\"1.0\" standalone=\"no\"?>\n";
@@ -44,7 +45,7 @@ void writeImage(Mesh &mesh, int width, int height, string filename, Vec3f camPos
 	outfile << "<g stroke=\"black\" fill=\"black\">\n";
 
 	// Sample code for generating image of the entire triangle mesh:
-	for (Mesh::ConstEdgeIter it = mesh.edges_begin(); it != mesh.edges_end(); ++it) {
+	/*for (Mesh::ConstEdgeIter it = mesh.edges_begin(); it != mesh.edges_end(); ++it) {
           Mesh::HalfedgeHandle h0 = mesh.halfedge_handle(it,0);
           Mesh::HalfedgeHandle h1 = mesh.halfedge_handle(it,1);
           Vec3f source(mesh.point(mesh.from_vertex_handle(h0)));
@@ -59,9 +60,24 @@ void writeImage(Mesh &mesh, int width, int height, string filename, Vec3f camPos
           outfile << "y1=\"" << height-p1[1] << "\" ";
           outfile << "x2=\"" << p2[0] << "\" ";
           outfile << "y2=\"" << height-p2[1] << "\" stroke-width=\"1\" />\n";
-	}
-	
+          }*/
+
 	// WRITE CODE HERE TO GENERATE A .SVG OF THE MESH --------------------------------------------------------------
+
+        // Dumb code to render all contour edges
+        for (list<ContourEdge>::const_iterator cit = contourEdges.begin(); cit != contourEdges.end(); ++cit) {
+          const ContourEdge& c = *cit;
+
+          if (!isVisible(c.source()) || !isVisible(c.target())) continue;
+
+          Vec3f p1 = toImagePlane(c.source());
+          Vec3f p2 = toImagePlane(c.target());
+          outfile << "<line ";
+          outfile << "x1=\"" << p1[0] << "\" ";
+          outfile << "y1=\"" << height-p1[1] << "\" ";
+          outfile << "x2=\"" << p2[0] << "\" ";
+          outfile << "y2=\"" << height-p2[1] << "\" stroke-width=\"1\" />\n";
+        }
 
 	// -------------------------------------------------------------------------------------------------------------
 	
