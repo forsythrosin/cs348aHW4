@@ -66,6 +66,7 @@ void renderSuggestiveContours(Vec3f actualCamPos) { // use this camera position 
 
 	  float wn = w.dot(n); //small angle btw surface normal and view vector
 	  float DwKw = w_S.dot(vcd.normalized());
+          //TODO: what DwKw to use? (what vertex?)
 
 	  if (acos(wn) > smallAngleThreshold && DwKw > thresholdDwKw) {
 	    //glColor3f((1+abs(wn))/2,(1+abs(wn))/2,(1+abs(wn))/2);
@@ -80,6 +81,7 @@ void renderSuggestiveContours(Vec3f actualCamPos) { // use this camera position 
 	    bool diff01 = Kw[0] * Kw[1] < 0,
 	      diff02 = Kw[0] * Kw[2] < 0,
 	      nonzero = Kw[0] != 0 && Kw[1] != 0 && Kw[2] != 0;
+            assert (nonzero);
 	    int j = -1;
 	    if (diff01) {
 	      if (diff02) {
@@ -100,6 +102,8 @@ void renderSuggestiveContours(Vec3f actualCamPos) { // use this camera position 
 		diff2 = Kw[j]-Kw[j2];
 	      assert(Kw[j] * Kw[j1] < 0);
 	      assert(Kw[j] * Kw[j2] < 0);
+              assert(Kw[j] / diff1 > 0);
+              assert(Kw[j] / diff2 > 0);
 	      Vec3f p1 = v[j] + Kw[j] / diff1 * (v[j1] - v[j]),
 		p2 = v[j] + Kw[j] / diff2 * (v[j2] - v[j]);
 	      glVertex3f(p1[0],p1[1],p1[2]);
@@ -359,7 +363,7 @@ int main(int argc, char** argv) {
 	cout << '\t' << mesh.n_edges() << " edges.\n";
 	cout << '\t' << mesh.n_faces() << " faces.\n";
 	
-	simplify(mesh, 0.10f);
+	//simplify(mesh, 0.10f);
 	
 	mesh.update_normals();
 	

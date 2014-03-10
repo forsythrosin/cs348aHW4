@@ -7,8 +7,6 @@ using namespace OpenMesh;
 using namespace Eigen;
 using namespace std;
 
-const double EPSILON = 0.00001;
-
 // Returns area of given face on mesh. It's assumed it's a triangle.
 double area(Mesh &mesh, FaceHandle fh) {
   //http://math.stackexchange.com/questions/128991/how-to-calculate-area-of-3d-triangle

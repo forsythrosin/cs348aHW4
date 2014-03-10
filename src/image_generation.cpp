@@ -67,6 +67,8 @@ void buildGraph(ContourGraph &graph, const list<ContourEdge>& contourEdges) {
     const ContourEdge &c = *cit;
     const Vec3f &v1 = c.source();
     const Vec3f &v2 = c.target();
+
+    if (v1 == v2) continue; //no self loops allowed
     graph.insertVertex(v1);
     graph.insertVertex(v2);
     graph.edges[graph.getVertex(v1)].push_back(graph.getVertex(v2));
@@ -101,9 +103,9 @@ void buildGraph(ContourGraph &graph, const list<ContourEdge>& contourEdges) {
 
       //Remove edge from neighbor -> *bvit, add edge from neighbor -> newVert
       const Vec3f *neighbor = vnbrs.front();
-      vnbrs.pop_front();
-      graph.edges[newVertPtr].push_back(neighbor);
+      vnbrs.remove(neighbor);
       graph.edges[neighbor].remove(v);
+      graph.edges[newVertPtr].push_back(neighbor);
       graph.edges[neighbor].push_back(newVertPtr);
     }
   }
@@ -112,19 +114,20 @@ void buildGraph(ContourGraph &graph, const list<ContourEdge>& contourEdges) {
 //List of chains of vertices
 typedef list< list <const Vec3f*> > ChainList;
 
-/*
-//Explore a chain starting at one of v's neighbors
-void exploreChain(ContourGraph &graph, const Vec3f *v, list <const Vec3f*>& chain) {
-  assert (graph.vertices.find(*v) != graph.vertices.end());
-  list <const Vec3f *>& nbrs = graph.edges[v];
-  const Vec3f *currVertex = nbrs.front(); //a neighbor of v; start exploring here
-  nbrs.pop_front();
-  const Vec3f *lastVertex = &v;
+//Explore a chain starting at currVertex, and traveling away from lastVertex.
+void exploreChain(ContourGraph &graph, const Vec3f *lastVertex,
+                  const Vec3f *currVertex, list <const Vec3f*>& chain) {
+  assert (graph.vertices.find(*lastVertex) != graph.vertices.end());
+  assert (graph.vertices.find(*currVertex) != graph.vertices.end());
   while (currVertex) {
     chain.push_back (currVertex);
-    list <const Vec3f *>* currNeighbors = NULL; //neighbor's neighbors
-    assert(graph.vertices.find(*currVertex) != graph.vertices.end());
-    currNeighbors = &graph.edges[currVertex];
+
+    //TODO...
+    //assert(graph.edges.find(currVertex) != graph.edges.end());
+    if (graph.edges.find(currVertex) == graph.edges.end())
+      return;
+    
+    list <const Vec3f *>* currNeighbors = &graph.edges[currVertex];
     assert(currNeighbors->size() <= 2);
     currNeighbors->remove (lastVertex);
     assert(currNeighbors->size() <= 1);
@@ -145,32 +148,33 @@ void exploreChain(ContourGraph &graph, const Vec3f *v, list <const Vec3f*>& chai
 void buildChains(ContourGraph &graph, ChainList &chains) {
   while (!graph.vertices.empty()) {
     list <const Vec3f*> chain1, chain2;
-    const Vec3f& v = graph.vertices.begin()->first;
+    const Vec3f *v = graph.vertices.begin()->second;
 
     //explore each chain of vertices from V (up to 2)
-    list <const Vec3f *>& vnbrs = graph.begin()->second; //v's neighbors
+    assert (graph.edges.find(v) != graph.edges.end());
+    list <const Vec3f *>& vnbrs = graph.edges[v]; //v's neighbors
     assert (vnbrs.size() <= 2);
     if (!vnbrs.empty()) {
-      exploreChain(graph, *vnbrs.front(), chain1);
-      vnbrs.pop_front();
+      exploreChain(graph, v, vnbrs.front(), chain1);
+      if (!vnbrs.empty()) vnbrs.pop_front(); //exploreChain could loop around back to beginning
     }
     if (!vnbrs.empty()) {
-      exploreChain(graph, *vnbrs.front(), chain2);
-      vnbrs.pop_front();
+      exploreChain(graph, v, vnbrs.front(), chain2);
+      if (!vnbrs.empty()) vnbrs.pop_front();
     }
     chain1.reverse();
-    graph.vertices.erase(v);
+    graph.vertices.erase(*v); //*v still exists, intentionally..
+    graph.edges.erase(v);
 
     //build one new chain
     list <const Vec3f*> newChain;
-    newChain.insert(newChain.end(), chain1.begin(), chain1.end());
-    newChain.push_back(&v);
-    newChain.insert(newChain.end(), chain2.begin(), chain2.end());
+    newChain.insert(newChain.begin(), chain2.begin(), chain2.end());
+    newChain.push_front(v);
+    newChain.insert(newChain.begin(), chain1.begin(), chain1.end());
 
     chains.push_back(newChain);
   }
 }
-*/
 
 Vec3f toImagePlane(Vec3f point) {
 	GLdouble point3DX = point[0], point3DY = point[1], point3DZ = point[2];
@@ -202,59 +206,81 @@ bool isVisible(Vec3f point) {
 
 void writeImage(Mesh &mesh, int width, int height, string filename, Vec3f camPos,
                 const list<ContourEdge>& contourEdges) {
-  cout << "writing image: " << filename << endl;
-
   cout << "building graph" << endl;
   ContourGraph graph;
   buildGraph(graph, contourEdges);
 
   cout << "building chains" << endl;
   ChainList chains;
-  //buildChains(graph, chains);
+  buildChains(graph, chains);
+  cout << "done building stuff" << endl;
 
-	ofstream outfile(filename.c_str());
-	outfile << "<?xml version=\"1.0\" standalone=\"no\"?>\n";
-	outfile << "<svg width=\"5in\" height=\"5in\" viewBox=\"0 0 " << width << ' ' << height << "\">\n";
-	outfile << "<g stroke=\"black\" fill=\"black\">\n";
+  cout << "writing image: " << filename << endl;
+  ofstream outfile(filename.c_str());
+  outfile << "<?xml version=\"1.0\" standalone=\"no\"?>\n";
+  outfile << "<svg width=\"5in\" height=\"5in\" viewBox=\"0 0 " << width << ' ' << height << "\">\n";
+  outfile << "<g stroke=\"black\" fill=\"black\">\n";
 
-	// Sample code for generating image of the entire triangle mesh:
-	/*for (Mesh::ConstEdgeIter it = mesh.edges_begin(); it != mesh.edges_end(); ++it) {
-          Mesh::HalfedgeHandle h0 = mesh.halfedge_handle(it,0);
-          Mesh::HalfedgeHandle h1 = mesh.halfedge_handle(it,1);
-          Vec3f source(mesh.point(mesh.from_vertex_handle(h0)));
-          Vec3f target(mesh.point(mesh.from_vertex_handle(h1)));
+  // Sample code for generating image of the entire triangle mesh:
+  /*for (Mesh::ConstEdgeIter it = mesh.edges_begin(); it != mesh.edges_end(); ++it) {
+    Mesh::HalfedgeHandle h0 = mesh.halfedge_handle(it,0);
+    Mesh::HalfedgeHandle h1 = mesh.halfedge_handle(it,1);
+    Vec3f source(mesh.point(mesh.from_vertex_handle(h0)));
+    Vec3f target(mesh.point(mesh.from_vertex_handle(h1)));
 	
-          if (!isVisible(source) || !isVisible(target)) continue;
+    if (!isVisible(source) || !isVisible(target)) continue;
 		
-          Vec3f p1 = toImagePlane(source);
-          Vec3f p2 = toImagePlane(target);
-          outfile << "<line ";
-          outfile << "x1=\"" << p1[0] << "\" ";
-          outfile << "y1=\"" << height-p1[1] << "\" ";
-          outfile << "x2=\"" << p2[0] << "\" ";
-          outfile << "y2=\"" << height-p2[1] << "\" stroke-width=\"1\" />\n";
-          }*/
-
-	// WRITE CODE HERE TO GENERATE A .SVG OF THE MESH --------------------------------------------------------------
-
-        // Dumb code to render all contour edges
-        for (list<ContourEdge>::const_iterator cit = contourEdges.begin(); cit != contourEdges.end(); ++cit) {
-          const ContourEdge& c = *cit;
-
-          if (!isVisible(c.source()) || !isVisible(c.target())) continue;
-
-          Vec3f p1 = toImagePlane(c.source());
-          Vec3f p2 = toImagePlane(c.target());
-          outfile << "<line ";
-          outfile << "x1=\"" << p1[0] << "\" ";
-          outfile << "y1=\"" << height-p1[1] << "\" ";
-          outfile << "x2=\"" << p2[0] << "\" ";
-          outfile << "y2=\"" << height-p2[1] << "\" stroke-width=\"1\" />\n";
-        }
-
-	// -------------------------------------------------------------------------------------------------------------
-	
-	outfile << "</g>\n";
-	outfile << "</svg>\n";
-        cout << "done" << endl;
+    Vec3f p1 = toImagePlane(source);
+    Vec3f p2 = toImagePlane(target);
+    outfile << "<line ";
+    outfile << "x1=\"" << p1[0] << "\" ";
+    outfile << "y1=\"" << height-p1[1] << "\" ";
+    outfile << "x2=\"" << p2[0] << "\" ";
+    outfile << "y2=\"" << height-p2[1] << "\" stroke-width=\"1\" />\n";
+    }*/
+  
+  // WRITE CODE HERE TO GENERATE A .SVG OF THE MESH --------------------------------------------------------------
+  
+  // Dumb code to render all contour edges
+  /*
+    for (list<ContourEdge>::const_iterator cit = contourEdges.begin(); cit != contourEdges.end(); ++cit) {
+    const ContourEdge& c = *cit;
+    
+    if (!isVisible(c.source()) || !isVisible(c.target())) continue;
+    
+    Vec3f p1 = toImagePlane(c.source());
+    Vec3f p2 = toImagePlane(c.target());
+    outfile << "<line ";
+    outfile << "x1=\"" << p1[0] << "\" ";
+    outfile << "y1=\"" << height-p1[1] << "\" ";
+    outfile << "x2=\"" << p2[0] << "\" ";
+    outfile << "y2=\"" << height-p2[1] << "\" stroke-width=\"1\" />\n";
+    }
+  */
+  
+  // Render chains of edges
+  for (ChainList::const_iterator lcit = chains.begin(); lcit != chains.end(); ++lcit) {
+    const list<const Vec3f*>& chain = *lcit;
+    const Vec3f* lastVertex = NULL;
+    for (list<const Vec3f*>::const_iterator cit = chain.begin(); cit != chain.end(); ++cit) {
+      const Vec3f* currVertex = *cit;
+      if (lastVertex) {
+        //if (!isVisible(*lastVertex) || !isVisible(*currVertex)) continue;
+        Vec3f p1 = toImagePlane(*lastVertex);
+        Vec3f p2 = toImagePlane(*currVertex);
+        outfile << "<line ";
+        outfile << "x1=\"" << p1[0] << "\" ";
+        outfile << "y1=\"" << height-p1[1] << "\" ";
+        outfile << "x2=\"" << p2[0] << "\" ";
+        outfile << "y2=\"" << height-p2[1] << "\" stroke-width=\"1\" />\n";
+      }
+      lastVertex = currVertex;
+    }
+  }
+  
+  // -------------------------------------------------------------------------------------------------------------
+  
+  outfile << "</g>\n";
+  outfile << "</svg>\n";
+  cout << "done" << endl;
 }

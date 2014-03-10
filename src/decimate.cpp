@@ -5,8 +5,6 @@
 using namespace OpenMesh;
 using namespace std;
 
-const double EPSILON = 0.00001;
-
 VPropHandleT<Quadricd> vquadric;
 VPropHandleT<float> vprio;
 VPropHandleT<Mesh::HalfedgeHandle> vtarget;
