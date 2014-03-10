@@ -45,16 +45,29 @@ struct ContourGraph {
     }
     return NULL;
   }
-  /*
-  list<const Vec3f*>* getEdges(const Vec3f& v) {
-    const Vec3f *pv = getVertex(v);
-    if (pv) {
-      assert (edges.find(pv) != edges.end());
-      return edges[pv];
-    }
-    return NULL;
-    }*/
 };
+
+// Split vertex V into 2 vertices. The new vertex is
+// connected to one of V's neigbhors, which is cut off
+// from V.
+void splitVertex(ContourGraph &graph, const Vec3f* v) {
+  //Add slightly perturbed vertex
+  Vec3f newVert = *v;
+  while (graph.getVertex(newVert) != NULL) {
+    newVert[0] += EPSILON;
+    newVert[1] += EPSILON;
+    newVert[2] += EPSILON;
+  }
+  graph.insertVertex(newVert);
+  const Vec3f* newVertPtr = graph.getVertex(newVert);
+
+  //Remove edge from neighbor -> *bvit, add edge from neighbor -> newVert
+  const Vec3f *neighbor = graph.edges[v].front();
+  graph.edges[v].remove(neighbor);
+  graph.edges[neighbor].remove(v);
+  graph.edges[newVertPtr].push_back(neighbor);
+  graph.edges[neighbor].push_back(newVertPtr);
+}
 
 //Build graph of contour edges
 void buildGraph(ContourGraph &graph, const list<ContourEdge>& contourEdges) {
@@ -92,22 +105,7 @@ void buildGraph(ContourGraph &graph, const list<ContourEdge>& contourEdges) {
     const Vec3f* v = *bvit;
     list<const Vec3f *> &vnbrs = graph.edges[v];
     while (vnbrs.size() > 2) {
-      //Add slightly perturbed vertex
-      Vec3f newVert = *v;
-      while (graph.getVertex(newVert) != NULL) {
-        newVert[0] += EPSILON;
-        newVert[1] += EPSILON;
-        newVert[2] += EPSILON;
-      }
-      graph.insertVertex(newVert);
-      const Vec3f* newVertPtr = graph.getVertex(newVert);
-
-      //Remove edge from neighbor -> *bvit, add edge from neighbor -> newVert
-      const Vec3f *neighbor = vnbrs.front();
-      vnbrs.remove(neighbor);
-      graph.edges[neighbor].remove(v);
-      graph.edges[newVertPtr].push_back(neighbor);
-      graph.edges[neighbor].push_back(newVertPtr);
+      splitVertex(graph, v);
     }
   }
 }
@@ -123,10 +121,9 @@ void exploreChain(ContourGraph &graph, const Vec3f *lastVertex,
   while (currVertex) {
     chain.push_back (currVertex);
 
-    //TODO...
-    //assert(graph.edges.find(currVertex) != graph.edges.end());
-    if (graph.edges.find(currVertex) == graph.edges.end())
-      return;
+    assert(graph.edges.find(currVertex) != graph.edges.end());
+    //if (graph.edges.find(currVertex) == graph.edges.end())
+    //  return;
     
     list <const Vec3f *>* currNeighbors = &graph.edges[currVertex];
     assert(currNeighbors->size() <= 2);
@@ -147,33 +144,54 @@ void exploreChain(ContourGraph &graph, const Vec3f *lastVertex,
 
 //Eat ContourGraph and build list of chains
 void buildChains(ContourGraph &graph, ChainList &chains) {
-  while (!graph.vertices.empty()) {
-    list <const Vec3f*> chain1, chain2;
-    const Vec3f *v = graph.vertices.begin()->second;
-
-    //explore each chain of vertices from V (up to 2)
+  //Collect vertices with one neighbor first-- easy starting points.
+  set<const Vec3f*> endPoints;
+  set<const Vec3f*> isolatedPoints; //no connecting edge
+  for (VertexMap::const_iterator vit = graph.vertices.begin(); vit != graph.vertices.end(); ++vit) {
+    const Vec3f *v = vit->second;
+    if (graph.edges[v].size() == 1) {
+      endPoints.insert(v);
+    }
+  }
+  
+  //Chomp chains that end in a single vertex
+  while (!endPoints.empty()) {
+    const Vec3f* v = *endPoints.begin();
+    list <const Vec3f*> chain;
     assert (graph.edges.find(v) != graph.edges.end());
-    list <const Vec3f *>& vnbrs = graph.edges[v]; //v's neighbors
-    assert (vnbrs.size() <= 2);
-    if (!vnbrs.empty()) {
-      exploreChain(graph, v, vnbrs.front(), chain1);
-      if (!vnbrs.empty()) vnbrs.pop_front(); //exploreChain could loop around back to beginning
-    }
-    if (!vnbrs.empty()) {
-      exploreChain(graph, v, vnbrs.front(), chain2);
-      if (!vnbrs.empty()) vnbrs.pop_front();
-    }
-    chain1.reverse();
-    graph.vertices.erase(*v); //*v still exists, intentionally..
+    list <const Vec3f *>& vnbrs = graph.edges[v];
+    assert (vnbrs.size() == 1);
+    exploreChain(graph, v, vnbrs.front(), chain);
+    chain.push_front(v);
+    chains.push_back(chain);
+    graph.vertices.erase(*v);
     graph.edges.erase(v);
 
-    //build one new chain
-    list <const Vec3f*> newChain;
-    newChain.insert(newChain.begin(), chain2.begin(), chain2.end());
-    newChain.push_front(v);
-    newChain.insert(newChain.begin(), chain1.begin(), chain1.end());
+    //remove all points on the chain
+    for (list<const Vec3f*>::const_iterator cit = chain.begin(); cit != chain.end(); ++cit) {
+      endPoints.erase(*cit);
+    }
+  }
 
-    chains.push_back(newChain);
+  //Chomp what's left-- these are chains that loop back on themselves.
+  //Cut them and eat them just like the normal chains
+  cout << graph.vertices.size() << " vertices belong to loops" << endl;
+  while (!graph.vertices.empty()) {
+    const Vec3f *v = graph.vertices.begin()->second;
+    assert (graph.edges.find(v) != graph.edges.end());
+    assert (graph.edges[v].size() == 2);
+    splitVertex(graph, v); //cut the loop
+
+    //now chomp it just like the well-behaved chains
+    list <const Vec3f*> chain;
+    assert (graph.edges.find(v) != graph.edges.end());
+    list <const Vec3f *>& vnbrs = graph.edges[v];
+    assert (vnbrs.size() == 1);
+    exploreChain(graph, v, vnbrs.front(), chain);
+    chain.push_front(v);
+    chains.push_back(chain);
+    graph.vertices.erase(*v);
+    graph.edges.erase(v);
   }
 }
 
