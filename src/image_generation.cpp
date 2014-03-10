@@ -271,14 +271,16 @@ void writeImage(Mesh &mesh, int width, int height, string filename, Vec3f camPos
     for (list<const Vec3f*>::const_iterator cit = chain.begin(); cit != chain.end(); ++cit) {
       const Vec3f* currVertex = *cit;
       if (lastVertex) {
-        //if (!isVisible(*lastVertex) || !isVisible(*currVertex)) continue;
-        Vec3f p1 = toImagePlane(*lastVertex);
-        Vec3f p2 = toImagePlane(*currVertex);
-        outfile << "<line ";
-        outfile << "x1=\"" << p1[0] << "\" ";
-        outfile << "y1=\"" << height-p1[1] << "\" ";
-        outfile << "x2=\"" << p2[0] << "\" ";
-        outfile << "y2=\"" << height-p2[1] << "\" stroke=\"" << sscolor.str() << "\" stroke-width=\"1\" />\n";
+        //TODO: why doesn't visibility test work?
+        //if (isVisible(*lastVertex) && isVisible(*currVertex)) {
+          Vec3f p1 = toImagePlane(*lastVertex);
+          Vec3f p2 = toImagePlane(*currVertex);
+          outfile << "<line ";
+          outfile << "x1=\"" << p1[0] << "\" ";
+          outfile << "y1=\"" << height-p1[1] << "\" ";
+          outfile << "x2=\"" << p2[0] << "\" ";
+          outfile << "y2=\"" << height-p2[1] << "\" stroke=\"" << sscolor.str() << "\" stroke-width=\"1\" />\n";
+          //}
       }
       lastVertex = currVertex;
     }
