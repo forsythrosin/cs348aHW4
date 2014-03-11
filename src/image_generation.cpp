@@ -300,6 +300,7 @@ void genCubic(list<Vec3f> &endPoints, list<Vec3f>& ctrlPoints,
   }
   endPoints.push_back(*deBoorPoints.rbegin());
   assert (endPoints.size() == deBoorPoints.size() - 2);
+  assert ((endPoints.size() - 1)*2 == ctrlPoints.size());
 }
 
 //write the SVG image
@@ -376,7 +377,34 @@ void writeImage(Mesh &mesh, int width, int height, string filename, Vec3f camPos
       {
         list<Vec3f> endPoints, ctrlPoints;
         genCubic(endPoints, ctrlPoints, chain);
-        //TODO: draw it
+
+        //write the cubic
+        bool Cwritten = false;
+        const Vec3f &firstPoint = *endPoints.begin();
+        outfile << "<path d=\"M" << firstPoint[0] << ","
+                << height - firstPoint[1] << " ";
+        endPoints.pop_front();
+        while (!ctrlPoints.empty()) {
+          assert (!endPoints.empty());
+          const Vec3f &cp1 = *ctrlPoints.begin();
+          ctrlPoints.pop_front();
+          const Vec3f &cp2 = *ctrlPoints.begin();
+          ctrlPoints.pop_front();
+          const Vec3f &ep2 = *endPoints.begin();
+          endPoints.pop_front();
+
+          if (!Cwritten) {
+            outfile << "C";
+            Cwritten = true;
+          }
+
+          //TODO: check visibility.
+          //Or better yet-- only build cubics for visible segments.
+          outfile << cp1[0] << "," << height-cp1[1] << " "
+                  << cp2[0] << "," << height-cp2[1] << " "
+                  << ep2[0] << "," << height-ep2[1] << " ";
+        }
+        outfile << "\" fill=\"none\" stroke=\"" << sscolor.str() << "\" stroke-width=\"1\" />\n";
         break;
       }
     }
