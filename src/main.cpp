@@ -43,71 +43,72 @@ void renderSuggestiveContours(Vec3f actualCamPos) { // use this camera position 
         glColor3f(.5,.5,.5);
 
 	float thresholdDwKw = 0.5;
-	float smallAngleThreshold = 3.14/8;
+	float smallAngleThreshold = 3.14/4;
 	
 	// RENDER SUGGESTIVE CONTOURS HERE -------------
 	Mesh::FaceIter f_it, f_end(mesh.faces_end());
 	for (f_it = mesh.faces_begin(); f_it != f_end; ++f_it) {
-	  Vec3f mesh_vcd = mesh.property(viewCurvatureDerivative, f_it);
-	  Vector3d vcd(mesh_vcd[0], mesh_vcd[1], mesh_vcd[2]);
-          Vec3f mesh_n = mesh.normal(f_it);
-	  Vector3d n(mesh_n[0], mesh_n[1], mesh_n[2]);
-	  n.normalize();
 
-          //TODO: why only for first vertex of face?
+	  // collect vertex data 
+	  int i;
+	  Vec3f v[3];
+	  float Kw[3];
 	  Mesh::FaceVertexIter fv_it = mesh.fv_iter(f_it.handle());
-	  Vec3f mesh_w = actualCamPos - mesh.point(fv_it.handle());
-	  Vector3d w(mesh_w[0], mesh_w[1], mesh_w[2]);
-	  w.normalize();
+	  for (i = 0; fv_it; ++fv_it, i++) {
+	    v[i] = mesh.point(fv_it);
+	    Kw[i] = mesh.property(viewCurvature, fv_it);
+	  }
+	  assert(i == 3);
 
-          //TODO: do we need this to compute DwKw or does it not make a difference?
-          Vector3d w_S = w - (w.dot(n)) * n;
-          w_S.normalize();
+	  // check wheter one vertex has a different curvature sign than the others
+	  bool diff01 = Kw[0] * Kw[1] < 0,
+	    diff02 = Kw[0] * Kw[2] < 0,
+	    nonZero = Kw[0] != 0 && Kw[1] != 0 && Kw[2] != 0;
 
-	  float wn = w.dot(n); //small angle btw surface normal and view vector
-	  float DwKw = w_S.dot(vcd.normalized());
-          //TODO: what DwKw to use? (what vertex?)
+	  // set j to the index of the vertex with different sign
+	  int j = -1;
+	  if (diff01) {
+	    j = diff02 ? 0 : 1;
+	  } else if (diff02) {
+	    j = 2;
+	  }
 
-	  if (acos(wn) > smallAngleThreshold && DwKw > thresholdDwKw) {
-	    //glColor3f((1+abs(wn))/2,(1+abs(wn))/2,(1+abs(wn))/2);
-	    int i;
-	    Vec3f v[3];
-	    float Kw[3];
-	    for (i = 0; fv_it; ++fv_it, i++) {
-	      v[i] = mesh.point(fv_it);
-	      Kw[i] = mesh.property(viewCurvature, fv_it);
-	    }
-	    assert(i == 3);
-	    bool diff01 = Kw[0] * Kw[1] < 0,
-	      diff02 = Kw[0] * Kw[2] < 0,
-	      nonzero = Kw[0] != 0 && Kw[1] != 0 && Kw[2] != 0;
+	  if (nonZero && j >= 0) {
+	    // vertex j has different sign
+	    int j1 = (j + 1) % 3,
+	      j2 = (j + 2) % 3;
+	    float diff1 = Kw[j] - Kw[j1],
+	      diff2 = Kw[j] - Kw[j2];
+	    Vec3f p1 = v[j] + Kw[j] / diff1 * (v[j1] - v[j]),
+	      p2 = v[j] + Kw[j] / diff2 * (v[j2] - v[j]),
+	      midPoint = (p1 + p2) / 2, // point on the triangle
+	      viewVector = actualCamPos - midPoint;
 
-            //assert (nonzero); //TODO: fails for the torus
-            
-	    int j = -1;
-	    if (diff01) {
-	      if (diff02) {
-		// v[0] different sign
-	        j = 0;
-	      } else {
-		// v[1] different sign
-		j = 1;
-	      }
-	    } else if (diff02) {
-	      // v[2] different sign
-	      j = 2;
-	    }
-	    if (nonzero && j >= 0) {
-	      // suggestive contour
-	      int j1 = (j+1)%3, j2 = (j+2)%3;
-	      float diff1 = Kw[j]-Kw[j1],
-		diff2 = Kw[j]-Kw[j2];
-	      assert(Kw[j] * Kw[j1] < 0);
-	      assert(Kw[j] * Kw[j2] < 0);
-              assert(Kw[j] / diff1 > 0);
-              assert(Kw[j] / diff2 > 0);
-	      Vec3f p1 = v[j] + Kw[j] / diff1 * (v[j1] - v[j]),
-		p2 = v[j] + Kw[j] / diff2 * (v[j2] - v[j]);
+	    // face normal
+	    Vec3f mesh_n = mesh.normal(f_it);
+	    Vector3d n(mesh_n[0], mesh_n[1], mesh_n[2]);
+	    n.normalize();
+
+	    // view vector
+	    Vector3d w(viewVector[0], viewVector[1], viewVector[2]);
+	    w.normalize();
+
+	    // Projection on the tangent plane
+	    Vector3d w_S = w - (w.dot(n)) * n;
+	    w_S.normalize();
+
+	    // angle btw view vector and face normal
+	    float wnAngle = acos(w.dot(n));
+
+	    // curvature gradient
+	    Vec3f mesh_vcg = mesh.property(viewCurvatureDerivative, f_it);
+	    Vector3d vcg(mesh_vcg[0], mesh_vcg[1], mesh_vcg[2]);
+
+	    // view curvature derivative
+	    float DwKw = w_S.dot(vcg.normalized());
+
+	    if (wnAngle > smallAngleThreshold && DwKw > thresholdDwKw) {
+	      // the suggestive contour should be drawn
 	      glVertex3f(p1[0],p1[1],p1[2]);
 	      glVertex3f(p2[0],p2[1],p2[2]);
 
