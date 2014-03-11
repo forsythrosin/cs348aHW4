@@ -223,6 +223,86 @@ bool isVisible(Vec3f point) {
 	return (bufDepth - projected[2]) > -EPSILON; // check sign!
 }
 
+//interpolate between two points
+Vec3f interpPoints(const Vec3f& v1, const Vec3f &v2, const float t) {
+  assert (0 <= t && t <= 1);
+  return v1 * (1 - t) + v2 * t;
+}
+
+//Generate a series of Cubic Bezier curves from list of passed deBoor Points
+void genCubic(list<Vec3f> &endPoints, list<Vec3f>& ctrlPoints,
+              const list<const Vec3f*> deBoorPoints3D)
+{
+  //Project input points to image plane
+  list<Vec3f> deBoorPoints;
+  for (list<const Vec3f*>::const_iterator iit = deBoorPoints3D.begin(); iit != deBoorPoints3D.end(); ++iit) {
+    deBoorPoints.push_back(toImagePlane(**iit));
+  }
+
+  //Build the Bezier control points from deBoor control points first
+  int N = deBoorPoints.size();
+  assert (N >= 4);
+  int i = 1; //count deBoor points: first, 2nd, ... next-to-last=N-1, last=N
+  const Vec3f* lastPoint = NULL;
+  const Vec3f* currPoint = NULL;
+  for (list<Vec3f>::const_iterator dbit = deBoorPoints.begin(); dbit != deBoorPoints.end(); ++dbit, ++i) {
+    currPoint = &*dbit;
+    if (i == 1 || i == N){
+      //first & last deBoor points are endpoints; skip
+      continue;
+    }
+    else if (i == 2) {
+      //2nd deBoor point is first control point
+      ctrlPoints.push_back(*currPoint);
+    }
+    else if (i == 3) {
+      //3rd deBoor point has one control point before it, by interpolation
+      ctrlPoints.push_back(interpPoints(*lastPoint, *currPoint, 0.5f));
+    }
+    else if (N > 4) {
+      if (i == N-1) {
+        //next-to-last deBoor point has one ctrl point before it, by interp, and is also a ctrl point itself
+        ctrlPoints.push_back(interpPoints(*lastPoint, *currPoint, 0.5f));
+        ctrlPoints.push_back(*currPoint);
+      }
+      else {
+        //all other deBoor points have 2 new control points before them; add by interp
+        ctrlPoints.push_back(interpPoints(*lastPoint, *currPoint, 1.0f/3.0f));
+        ctrlPoints.push_back(interpPoints(*lastPoint, *currPoint, 2.0f/3.0f));
+      }
+    }
+    lastPoint = currPoint;
+  }
+  assert (ctrlPoints.size() % 2 == 0); //each segment of curve must have 2 ctrl points
+
+  //Now build the endpoints.
+  //The idea is to start at the 1st control point, and iterate forward
+  //2 points at a time from that. After reaching a control point i,
+  //interpolate between it and i-1 to get a new endpoint.
+  list<Vec3f>::const_iterator cit = ctrlPoints.begin();
+  ++cit;
+  endPoints.push_back(*deBoorPoints.begin());
+  while(cit != ctrlPoints.end()) {
+    const Vec3f* v1 = NULL;
+    const Vec3f* v2 = NULL;
+    ++cit;
+    if (cit != ctrlPoints.end()) {
+      v1 = &*cit;
+      ++cit;
+    }
+    if (cit != ctrlPoints.end()) {
+      v2 = &*cit;
+    }
+
+    if (v1 && v2) {
+      endPoints.push_back(interpPoints(*v1, *v2, 0.5f));
+    }
+  }
+  endPoints.push_back(*deBoorPoints.rbegin());
+  assert (endPoints.size() == deBoorPoints.size() - 2);
+}
+
+//write the SVG image
 void writeImage(Mesh &mesh, int width, int height, string filename, Vec3f camPos,
                 const list<ContourEdge>& contourEdges) {
   cout << "building graph" << endl;
@@ -294,7 +374,9 @@ void writeImage(Mesh &mesh, int width, int height, string filename, Vec3f camPos
       }
     default: //cubic
       {
-        //drawcubic();
+        list<Vec3f> endPoints, ctrlPoints;
+        genCubic(endPoints, ctrlPoints, chain);
+        //TODO: draw it
         break;
       }
     }
