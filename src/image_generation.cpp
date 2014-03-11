@@ -9,6 +9,10 @@
 using namespace OpenMesh;
 using namespace std;
 
+static GLfloat *bufDepth; //Build this whenever image is written
+static int windowWidth; //duplicate...
+static int windowHeight;
+
 struct VertexCompare : public binary_function <Vec3f, Vec3f, bool> {
   bool operator() (const Vec3f& v1, const Vec3f &v2) const {
     if (v1[0] < v2[0]) return true;
@@ -213,14 +217,15 @@ Vec3f toImagePlane(Vec3f point) {
 // Adapted from
 // http://stackoverflow.com/questions/1311869/opengl-how-to-determine-if-a-3d-rendered-point-is-occluded-by-other-3d-rende
 bool isVisible(Vec3f point) {
-	Vec3f projected = toImagePlane(point);
+  assert (bufDepth);
+  Vec3f projected = toImagePlane(point);
 
-	GLfloat bufDepth = 0.0;
-	glReadPixels(static_cast<GLint>( projected[0] ), static_cast<GLint>( projected[1] ),
-		     1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, &bufDepth);
+  int i = projected[0]; //X
+  int j = projected[1]; //Y
+  assert (j < windowHeight);
 
-	GLdouble EPSILON = 0.01;
-	return (bufDepth - projected[2]) > -EPSILON; // check sign!
+  //Show all curves at or above surface
+  return projected[2] >= bufDepth[j*windowWidth + i]; //EPSILON?
 }
 
 //interpolate between two points
@@ -306,9 +311,26 @@ void genCubic(list<Vec3f> &endPoints, list<Vec3f>& ctrlPoints,
 //write the SVG image
 void writeImage(Mesh &mesh, int width, int height, string filename, Vec3f camPos,
                 const list<ContourEdge>& contourEdges) {
+
+  //read it all at once for speed
+  windowWidth = width;
+  windowHeight = height;
+  bufDepth = new GLfloat[height*width];
+  glReadPixels(0, 0, width, height, GL_DEPTH_COMPONENT, GL_FLOAT, bufDepth);
+
+  list<ContourEdge> filteredEdges;
+  for (list<ContourEdge>::const_iterator eit = contourEdges.begin();
+       eit != contourEdges.end();
+       ++eit) {
+    const ContourEdge& e = *eit;
+    if (isVisible(e.mp1) && isVisible(e.mp2))
+      filteredEdges.push_back(e);
+  }
+  cout << contourEdges.size() - filteredEdges.size() << "/" << contourEdges.size() << " contours filtered" << endl;
+  
   cout << "building graph" << endl;
   ContourGraph graph;
-  buildGraph(graph, contourEdges);
+  buildGraph(graph, filteredEdges);
 
   cout << "building chains" << endl;
   ChainList chains;
@@ -343,15 +365,15 @@ void writeImage(Mesh &mesh, int width, int height, string filename, Vec3f camPos
       {
         const Vec3f* v1 = *chain.begin();
         const Vec3f* v2 = *chain.rbegin();
-        //        if (isVisible(*v1) && isVisible(*v2)) {
-          Vec3f p1 = toImagePlane(*v1);
-          Vec3f p2 = toImagePlane(*v2);
-          outfile << "<line ";
-          outfile << "x1=\"" << p1[0] << "\" ";
-          outfile << "y1=\"" << height-p1[1] << "\" ";
-          outfile << "x2=\"" << p2[0] << "\" ";
-          outfile << "y2=\"" << height-p2[1] << "\" stroke=\"" << sscolor.str() << "\" stroke-width=\"1\" />\n";
-          //        }
+
+        Vec3f p1 = toImagePlane(*v1);
+        Vec3f p2 = toImagePlane(*v2);
+        outfile << "<line ";
+        outfile << "x1=\"" << p1[0] << "\" ";
+        outfile << "y1=\"" << height-p1[1] << "\" ";
+        outfile << "x2=\"" << p2[0] << "\" ";
+        outfile << "y2=\"" << height-p2[1] << "\" stroke=\"" << sscolor.str() << "\" stroke-width=\"1\" />\n";
+
         break;
       }
     case 3: //quadratic
@@ -364,13 +386,12 @@ void writeImage(Mesh &mesh, int width, int height, string filename, Vec3f camPos
         Vec3f p2 = toImagePlane(*v2);
         Vec3f p3 = toImagePlane(*v3);
 
-        //        if (isVisible(*v1) && isVisible(*v2)) {
         outfile << "<path "
                 << "d=\"M" << p1[0] << "," << height-p1[1]
                 << " Q" << p2[0] << "," << height-p2[1]
                 << " " << p3[0] << "," << height-p3[1]
                 << "\" fill=\"none\" stroke=\"" << sscolor.str() << "\" stroke-width=\"1\" />\n";
-        //}
+
         break;
       }
     default: //cubic
@@ -415,4 +436,7 @@ void writeImage(Mesh &mesh, int width, int height, string filename, Vec3f camPos
   outfile << "</g>\n";
   outfile << "</svg>\n";
   cout << "done" << endl;
+
+  //TODO delete
+  //delete[] bufDepth;
 }
