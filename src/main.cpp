@@ -148,6 +148,8 @@ void renderMesh() {
               glBegin(GL_LINE_LOOP);
               for (fv_it = mesh.fv_iter(fh); fv_it; ++fv_it) {
                 Mesh::VertexHandle vh = fv_it.handle();
+                normal = mesh.normal(vh);
+                glNormal3f(normal.values_[0], normal.values_[1], normal.values_[2]);
                 point = mesh.point(vh);
                 glVertex3f(point.values_[0], point.values_[1], point.values_[2]);
               }

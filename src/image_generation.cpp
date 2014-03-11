@@ -239,68 +239,64 @@ void writeImage(Mesh &mesh, int width, int height, string filename, Vec3f camPos
   outfile << "<?xml version=\"1.0\" standalone=\"no\"?>\n";
   outfile << "<svg width=\"5in\" height=\"5in\" viewBox=\"0 0 " << width << ' ' << height << "\">\n";
   outfile << "<g stroke=\"black\" fill=\"black\">\n";
-
-  // Sample code for generating image of the entire triangle mesh:
-  /*for (Mesh::ConstEdgeIter it = mesh.edges_begin(); it != mesh.edges_end(); ++it) {
-    Mesh::HalfedgeHandle h0 = mesh.halfedge_handle(it,0);
-    Mesh::HalfedgeHandle h1 = mesh.halfedge_handle(it,1);
-    Vec3f source(mesh.point(mesh.from_vertex_handle(h0)));
-    Vec3f target(mesh.point(mesh.from_vertex_handle(h1)));
-	
-    if (!isVisible(source) || !isVisible(target)) continue;
-		
-    Vec3f p1 = toImagePlane(source);
-    Vec3f p2 = toImagePlane(target);
-    outfile << "<line ";
-    outfile << "x1=\"" << p1[0] << "\" ";
-    outfile << "y1=\"" << height-p1[1] << "\" ";
-    outfile << "x2=\"" << p2[0] << "\" ";
-    outfile << "y2=\"" << height-p2[1] << "\" stroke-width=\"1\" />\n";
-    }*/
   
   // WRITE CODE HERE TO GENERATE A .SVG OF THE MESH --------------------------------------------------------------
-  
-  // Dumb code to render all contour edges
-  /*
-    for (list<ContourEdge>::const_iterator cit = contourEdges.begin(); cit != contourEdges.end(); ++cit) {
-    const ContourEdge& c = *cit;
-    
-    if (!isVisible(c.source()) || !isVisible(c.target())) continue;
-    
-    Vec3f p1 = toImagePlane(c.source());
-    Vec3f p2 = toImagePlane(c.target());
-    outfile << "<line ";
-    outfile << "x1=\"" << p1[0] << "\" ";
-    outfile << "y1=\"" << height-p1[1] << "\" ";
-    outfile << "x2=\"" << p2[0] << "\" ";
-    outfile << "y2=\"" << height-p2[1] << "\" stroke-width=\"1\" />\n";
-    }
-  */
   
   // Render chains of edges
   //static const char* COLORS[] = {"red", "black", "blue", "green", "orange", "magenta", "cyan"};
   //static const int N_COLORS = sizeof(COLORS) / sizeof(const char*);
   for (ChainList::const_iterator lcit = chains.begin(); lcit != chains.end(); ++lcit) {
     const list<const Vec3f*>& chain = *lcit;
-    const Vec3f* lastVertex = NULL;
-    //const char* color = COLORS[rand() % N_COLORS];
     stringstream sscolor;
     sscolor << "rgb(" << rand() % 256 << "," << rand() % 256 << "," << rand() % 256 << ")";
-    for (list<const Vec3f*>::const_iterator cit = chain.begin(); cit != chain.end(); ++cit) {
-      const Vec3f* currVertex = *cit;
-      if (lastVertex) {
-        //TODO: why doesn't visibility test work?
-        //if (isVisible(*lastVertex) && isVisible(*currVertex)) {
-          Vec3f p1 = toImagePlane(*lastVertex);
-          Vec3f p2 = toImagePlane(*currVertex);
+
+    int N = chain.size();
+    switch (N) {
+    case 0:
+    case 1:
+      {
+        //shouldn't happen-- just drop it.
+        break;
+      }
+    case 2: //line segment
+      {
+        const Vec3f* v1 = *chain.begin();
+        const Vec3f* v2 = *chain.rbegin();
+        //        if (isVisible(*v1) && isVisible(*v2)) {
+          Vec3f p1 = toImagePlane(*v1);
+          Vec3f p2 = toImagePlane(*v2);
           outfile << "<line ";
           outfile << "x1=\"" << p1[0] << "\" ";
           outfile << "y1=\"" << height-p1[1] << "\" ";
           outfile << "x2=\"" << p2[0] << "\" ";
           outfile << "y2=\"" << height-p2[1] << "\" stroke=\"" << sscolor.str() << "\" stroke-width=\"1\" />\n";
-          //}
+          //        }
+        break;
       }
-      lastVertex = currVertex;
+    case 3: //quadratic
+      {
+        const Vec3f *v1 = *chain.begin();
+        const Vec3f *v2 = *(++chain.begin());
+        const Vec3f *v3 = *chain.rbegin();
+
+        Vec3f p1 = toImagePlane(*v1);
+        Vec3f p2 = toImagePlane(*v2);
+        Vec3f p3 = toImagePlane(*v3);
+
+        //        if (isVisible(*v1) && isVisible(*v2)) {
+        outfile << "<path "
+                << "d=\"M" << p1[0] << "," << height-p1[1]
+                << " Q" << p2[0] << "," << height-p2[1]
+                << " " << p3[0] << "," << height-p3[1]
+                << "\" fill=\"none\" stroke=\"" << sscolor.str() << "\" stroke-width=\"1\" />\n";
+        //}
+        break;
+      }
+    default: //cubic
+      {
+        //drawcubic();
+        break;
+      }
     }
   }
   
