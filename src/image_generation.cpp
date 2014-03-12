@@ -222,10 +222,11 @@ bool isVisible(Vec3f point) {
 
   int i = projected[0]; //X
   int j = projected[1]; //Y
-  assert (j < windowHeight);
+  if (i < 0 || i > windowWidth) return false;
+  if (j < 0 || j > windowHeight) return false;
 
   //Show all curves at or above surface
-  return projected[2] >= bufDepth[j*windowWidth + i]; //EPSILON?
+  return projected[2] <= bufDepth[j*windowWidth + i] * 1.001/0.999;
 }
 
 //interpolate between two points
@@ -317,6 +318,23 @@ void writeImage(Mesh &mesh, int width, int height, string filename, Vec3f camPos
   windowHeight = height;
   bufDepth = new GLfloat[height*width];
   glReadPixels(0, 0, width, height, GL_DEPTH_COMPONENT, GL_FLOAT, bufDepth);
+
+  //collect some stats
+  float minDepth = 1.0f; //min/max depth on a shape
+  float maxDepth = 0.0f;
+  for (int i = 0; i < height; i++) {
+    for (int j = 0; j < width; j++) {
+      GLfloat d = bufDepth[i*width + j];
+      if (d != 0.0f) {
+        if (d < minDepth) minDepth = d;
+      }
+      if (d != 1.0f) {
+        if (d > maxDepth) maxDepth = d;
+      }
+    }
+  }
+  cout << "mindepth = " << minDepth << endl
+       << "maxdepth = " << maxDepth << endl;
 
   list<ContourEdge> filteredEdges;
   for (list<ContourEdge>::const_iterator eit = contourEdges.begin();

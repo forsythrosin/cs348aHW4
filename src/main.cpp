@@ -129,7 +129,8 @@ void renderMesh() {
 	glEnable(GL_LIGHTING);
 	glLightfv(GL_LIGHT0, GL_POSITION, cameraPos);
 
-	glDepthRange(0.001,1);
+        float znear = 0.001, zfar = 1, zeps = 0.0001;
+	glDepthRange(znear, zfar);
 	glEnable(GL_NORMALIZE);
 
         Vec3f actualCamPos(cameraPos[0]+pan[0],cameraPos[1]+pan[1],cameraPos[2]+pan[2]);
@@ -175,8 +176,9 @@ void renderMesh() {
           glColorMask(GL_TRUE,GL_TRUE,GL_TRUE,GL_TRUE);
 	
 	glDisable(GL_LIGHTING);
-	glDepthRange(0,0.999);
+	glDepthRange(znear-zeps, zfar-zeps);
 
+        glDepthMask(GL_FALSE);
         if (showSuggestiveContours) {
           renderSuggestiveContours(actualCamPos);
         }
@@ -240,7 +242,7 @@ void renderMesh() {
 		glEnd();
 	}
 	
-	glDepthRange(0,1);
+	glDepthRange(znear,zfar);
 }
 
 void display() {
@@ -282,7 +284,8 @@ void display() {
 			glColor3f(0,0,1); glVertex3f(0,0,0); glVertex3f(0,0,1); // z axis
 		glEnd(/*GL_LINES*/);
 	}
-	
+
+        glDepthMask(GL_TRUE);
 	glutSwapBuffers();
 }
 
