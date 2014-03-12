@@ -354,7 +354,7 @@ void writeImage(Mesh &mesh, int width, int height, string filename, Vec3f camPos
     const ContourEdge& e = *eit;
     float margin = 1.001;
     if (e.silhouette)
-      margin = 1.005; //a bit more lenient with silhouettes
+      margin = 1.002; //a bit more lenient with silhouettes
     if (isVisible(e.mp1, margin) ||
         isVisible(e.mp2, margin))
       filteredEdges.push_back(e);
@@ -379,12 +379,11 @@ void writeImage(Mesh &mesh, int width, int height, string filename, Vec3f camPos
   // WRITE CODE HERE TO GENERATE A .SVG OF THE MESH --------------------------------------------------------------
   
   // Render chains of edges
-  //static const char* COLORS[] = {"red", "black", "blue", "green", "orange", "magenta", "cyan"};
-  //static const int N_COLORS = sizeof(COLORS) / sizeof(const char*);
   for (ChainList::const_iterator lcit = chains.begin(); lcit != chains.end(); ++lcit) {
     const list<const Vec3f*>& chain = *lcit;
     stringstream sscolor;
-    sscolor << "rgb(" << rand() % 256 << "," << rand() % 256 << "," << rand() % 256 << ")";
+    //sscolor << "rgb(" << rand() % 256 << "," << rand() % 256 << "," << rand() % 256 << ")";
+    sscolor << "black";
 
     int N = chain.size();
     switch (N) {
