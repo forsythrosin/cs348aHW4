@@ -33,8 +33,8 @@ float shininess[] = { 50.0 };
 //all contour edges of interest
 static list<ContourEdge> contourEdges;
 
-inline void addContourEdge(const Vec3f &p1, const Vec3f &p2) {
-  contourEdges.push_back(ContourEdge(p1, p2));
+inline void addContourEdge(const Vec3f &p1, const Vec3f &p2, bool isSilhouette) {
+  contourEdges.push_back(ContourEdge(p1, p2, isSilhouette));
 }
 
 void renderSuggestiveContours(Vec3f actualCamPos) { // use this camera position to account for panning etc.
@@ -111,7 +111,7 @@ void renderSuggestiveContours(Vec3f actualCamPos) { // use this camera position 
 	      glVertex3f(p1[0],p1[1],p1[2]);
 	      glVertex3f(p2[0],p2[1],p2[2]);
 
-              addContourEdge(p1, p2);
+              addContourEdge(p1, p2, false);
 	    }
 	  }
 	}
@@ -129,7 +129,7 @@ void renderMesh() {
 	glEnable(GL_LIGHTING);
 	glLightfv(GL_LIGHT0, GL_POSITION, cameraPos);
 
-        float znear = 0.001, zfar = 1, zeps = 0.0001;
+        float znear = 0.001, zfar = 1, zeps = 0.001;
 	glDepthRange(znear, zfar);
 	glEnable(GL_NORMALIZE);
 
@@ -189,15 +189,18 @@ void renderMesh() {
           glColor3f(0,0,0);
           glLineWidth(2.0f);
           for (Mesh::ConstEdgeIter it = mesh.edges_begin(); it != mesh.edges_end(); ++it)
-            if (isFeatureEdge(mesh,*it,actualCamPos)) {
-              Mesh::HalfedgeHandle h0 = mesh.halfedge_handle(it,0);
-              Mesh::HalfedgeHandle h1 = mesh.halfedge_handle(it,1);
-              Vec3f source(mesh.point(mesh.from_vertex_handle(h0)));
-              Vec3f target(mesh.point(mesh.from_vertex_handle(h1)));
-              glVertex3f(source[0],source[1],source[2]);
-              glVertex3f(target[0],target[1],target[2]);
-
-              addContourEdge(source, target);
+            {
+              bool silhouette;
+              if (isFeatureEdge(mesh,*it,actualCamPos, silhouette)) {
+                Mesh::HalfedgeHandle h0 = mesh.halfedge_handle(it,0);
+                Mesh::HalfedgeHandle h1 = mesh.halfedge_handle(it,1);
+                Vec3f source(mesh.point(mesh.from_vertex_handle(h0)));
+                Vec3f target(mesh.point(mesh.from_vertex_handle(h1)));
+                glVertex3f(source[0],source[1],source[2]);
+                glVertex3f(target[0],target[1],target[2]);
+                
+                addContourEdge(source, target, silhouette);
+              }
             }
           glEnd();
         }
@@ -375,7 +378,7 @@ int main(int argc, char** argv) {
 	cout << '\t' << mesh.n_edges() << " edges.\n";
 	cout << '\t' << mesh.n_faces() << " faces.\n";
 	
-	simplify(mesh, 0.10f);
+	//simplify(mesh, 0.10f);
 	
 	mesh.update_normals();
 	

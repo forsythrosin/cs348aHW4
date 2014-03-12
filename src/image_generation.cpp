@@ -207,7 +207,11 @@ Vec3f toImagePlane(Vec3f point) {
 	glGetDoublev(GL_MODELVIEW_MATRIX, modelMatrix);
 	glGetDoublev(GL_PROJECTION_MATRIX, projMatrix);
 	glGetIntegerv(GL_VIEWPORT, viewport);
-	
+
+        //For some reason, extracting the depth buffer
+        //is very iffy. Sometimes it has usable data, but
+        //sometimes it just has garbage. It seems like it
+        //takes a few tries to get it right?
 	GLdouble point2DX, point2DY, point2DZ;
 	gluProject(point3DX, point3DY, point3DZ, modelMatrix, projMatrix, viewport, &point2DX, &point2DY, &point2DZ);
 	
@@ -216,7 +220,7 @@ Vec3f toImagePlane(Vec3f point) {
 
 // Adapted from
 // http://stackoverflow.com/questions/1311869/opengl-how-to-determine-if-a-3d-rendered-point-is-occluded-by-other-3d-rende
-bool isVisible(Vec3f point) {
+bool isVisible(Vec3f point, float margin) {
   assert (bufDepth);
   Vec3f projected = toImagePlane(point);
 
@@ -225,8 +229,10 @@ bool isVisible(Vec3f point) {
   if (i < 0 || i > windowWidth) return false;
   if (j < 0 || j > windowHeight) return false;
 
-  //Show all curves at or above surface
-  return projected[2] <= bufDepth[j*windowWidth + i] * 1.001/0.999;
+  //Show all curves at or above surface.
+  //Add a little bit of room for error; the extra factor
+  //on bufDepth was selected empirically.
+  return projected[2] <= bufDepth[j*windowWidth + i]*margin;
 }
 
 //interpolate between two points
@@ -336,12 +342,21 @@ void writeImage(Mesh &mesh, int width, int height, string filename, Vec3f camPos
   cout << "mindepth = " << minDepth << endl
        << "maxdepth = " << maxDepth << endl;
 
+  //Filter out contour edges that can't be seen.
+  //This takes a little bit of trial and error.
+  //Silhouette edges are always displayed.
+  //Otherwise, only contour edges where both endpoints
+  //are visible are displayed.
   list<ContourEdge> filteredEdges;
   for (list<ContourEdge>::const_iterator eit = contourEdges.begin();
        eit != contourEdges.end();
        ++eit) {
     const ContourEdge& e = *eit;
-    if (isVisible(e.mp1) && isVisible(e.mp2))
+    float margin = 1.001;
+    if (e.silhouette)
+      margin = 1.005; //a bit more lenient with silhouettes
+    if (isVisible(e.mp1, margin) ||
+        isVisible(e.mp2, margin))
       filteredEdges.push_back(e);
   }
   cout << contourEdges.size() - filteredEdges.size() << "/" << contourEdges.size() << " contours filtered" << endl;

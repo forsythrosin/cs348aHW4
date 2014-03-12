@@ -38,7 +38,8 @@ bool isSharpEdge(Mesh &mesh, const Mesh::EdgeHandle &e) {
     // --------------------------------------
 }
 
-bool isFeatureEdge(Mesh &mesh, const Mesh::EdgeHandle &e, Vec3f cameraPos) {
-	return mesh.is_boundary(e) || isSilhouette(mesh,e, cameraPos) || isSharpEdge(mesh,e);
+bool isFeatureEdge(Mesh &mesh, const Mesh::EdgeHandle &e, Vec3f cameraPos, bool& silhouette) {
+  silhouette = isSilhouette(mesh,e, cameraPos);
+  return mesh.is_boundary(e) || silhouette || isSharpEdge(mesh,e);
 }
 
