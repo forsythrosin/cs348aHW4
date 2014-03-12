@@ -344,9 +344,10 @@ void writeImage(Mesh &mesh, int width, int height, string filename, Vec3f camPos
 
   //Filter out contour edges that can't be seen.
   //This takes a little bit of trial and error.
-  //Silhouette edges are always displayed.
-  //Otherwise, only contour edges where both endpoints
-  //are visible are displayed.
+  //We want most silhouette edges to be visible, so we make them a bit
+  //easier to regard as "visible".
+  //Secondly, contour edges where either endpoint is visible are shown--
+  //this is so we don't see gaps where an edge would go behind a mesh.
   list<ContourEdge> filteredEdges;
   for (list<ContourEdge>::const_iterator eit = contourEdges.begin();
        eit != contourEdges.end();
@@ -451,7 +452,6 @@ void writeImage(Mesh &mesh, int width, int height, string filename, Vec3f camPos
             Cwritten = true;
           }
 
-          //TODO: check visibility.
           //Or better yet-- only build cubics for visible segments.
           outfile << cp1[0] << "," << height-cp1[1] << " "
                   << cp2[0] << "," << height-cp2[1] << " "
@@ -469,6 +469,5 @@ void writeImage(Mesh &mesh, int width, int height, string filename, Vec3f camPos
   outfile << "</svg>\n";
   cout << "done" << endl;
 
-  //TODO delete
-  //delete[] bufDepth;
+  delete[] bufDepth;
 }

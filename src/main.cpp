@@ -379,7 +379,7 @@ int main(int argc, char** argv) {
 	cout << '\t' << mesh.n_edges() << " edges.\n";
 	cout << '\t' << mesh.n_faces() << " faces.\n";
 	
-	simplify(mesh, 0.10f);
+	simplify(mesh, 0.50f);
 	
 	mesh.update_normals();
 	
@@ -415,7 +415,7 @@ int main(int argc, char** argv) {
 	glutMotionFunc(mouseMoved);
 	glutMouseFunc(mouse);
 	glutReshapeFunc(reshape);
-	glutKeyboardFunc(keyboard); //TODO: is this asynchronous?
+	glutKeyboardFunc(keyboard);
 
 	glutMainLoop();
 	

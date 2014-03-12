@@ -252,7 +252,6 @@ void decimate(Mesh &mesh, unsigned int _n_vertices) {
             mesh.collapse(vhe_handle);
             --nv;
 
-            //TODO: check this part with TAs
             //Find vertices affected by collapse.
             //The affected vertices are neighbors of vj
             //(the vertex that was *not* deleted),
